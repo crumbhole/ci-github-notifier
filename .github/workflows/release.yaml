@@ -9,7 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
+      - name: Get git tag
+        uses: little-core-labs/get-git-tag@v3.0.1
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
         with:
