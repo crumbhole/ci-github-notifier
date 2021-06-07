@@ -1,4 +1,4 @@
-FROM docker.sendilab.net/proxy/library/golang:alpine AS builder
+FROM golang:alpine AS builder
 WORKDIR $GOPATH/src/sendible.com/sendible-labs
 
 COPY ci-github-notifier .
