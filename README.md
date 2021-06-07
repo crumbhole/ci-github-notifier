@@ -2,7 +2,7 @@
 A lightweight container to post the status of a CI task to GitHub, allowing GitHub users to see the status of a PR or Branch.
 
 # API information 
-A repository status notification message to GitHub consists of three elements
+A repository status notification message to GitHub consists of four elements
 
 | Name 	| Type |	Description|
 |----   |----   |   ----    |
