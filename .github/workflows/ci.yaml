@@ -20,6 +20,6 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v2
         with:
-          # push: true # Will only build if this is not here
+          push: true
           tags: |
             ghcr.io/${{ github.repository }}:latest
