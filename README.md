@@ -62,4 +62,4 @@ docker run \
 ```
 
 # Argo Workflows example
-todo
+A simple Argo Workflows template can be found in the examples directory.

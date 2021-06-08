@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: workflowTemplate
+metadata:
+  generateName: simple-ci-github-notifier
+  annotations:
+    workflows.argoproj.io/description: >-
+      Notify GitHub of the current state of a CI job.
+
+      You will need to complete the parameter values in order for this to run successfully.
+      In production, we would not recommend hard-coding your GitHub personal access token in this way.
+      You could mount a secret and define it using tokenFile, or use something like Hashicorp's Vault Agent Injector.
+    workflows.argoproj.io/maintainer: '@tim_sendible'
+    workflows.argoproj.io/tags: github
+    workflows.argoproj.io/version: '>= 2.9.0'
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    dag:
+      tasks:
+        - name: notify-github-pending
+          template: github-notifier
+          arguments:
+            parameters:
+              - name: app_repo
+                value: ""
+              - name: git_sha
+                value: ""
+              - name: state
+                value: "pending"
+              - name: target_url
+                value: ""
+              - name: context
+                value: ""
+              - name: description
+                value: ""
+              - name: organisation
+                value: ""
+              - name: access_token
+                value: ""
+
+  - name: github-notifier
+    inputs:
+      parameters:
+      - name: state
+      - name: target_url
+      - name: description
+      - name: context
+      - name: app_repo
+      - name: git_sha
+      - name: access_token
+      - name: organisation
+    container:
+      image: ghcr.io/sendible-labs/ci-github-notifier:stable
+      imagePullPolicy: Always
+      env:
+        - name: state
+          value: "{{inputs.parameters.state}}"
+        - name: target_url
+          value: "{{inputs.parameters.target_url}}"
+        - name: description
+          value: "{{inputs.parameters.description}}"
+        - name: context
+          value: "{{inputs.parameters.context}}"
+        - name: access_token
+          value: "{{inputs.parameters.access_token}}"
+        - name: organisation
+          value: "{{inputs.parameters.organisation}}"
+        - name: app_repo
+          value: "{{inputs.parameters.app_repo}}"
+        - name: git_sha
+          value: "{{inputs.parameters.git_sha}}"
+      resources:
+        requests:
+          memory: 8Mi
+          cpu: 1m
+      #Timeout after 5 minutes
+      activeDeadlineSeconds: 300
