@@ -1,6 +1,9 @@
 # ci-github-notifier
 A lightweight container to post the status of a CI task to GitHub, allowing GitHub users to see the status of a PR or Branch. Designed for cloud native workflows (eg [Argo Workflows](https://argoproj.github.io/argo-workflows/), or [Tekton](https://tekton.dev/)), but will run wherever a container can be run.
 
+
+[![Build](https://github.com/sendible-labs/ci-github-notifier/workflows/ci/badge.svg)](https://github.com/sendible-labs/ci-github-notifier/actions?query=workflow%3Aci)
+
 # Environment Variables
 We pass key information to the container using environment variables.
 First, we provide the necessary values for the GitHub status API:
