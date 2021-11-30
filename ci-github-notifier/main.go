@@ -19,7 +19,7 @@ func main() {
 	values := map[string]string{"state": getValidatedEnvVar("state"), "target_url": getValidatedEnvVar("target_url"), "description": getValidatedEnvVar("description"), "context": getValidatedEnvVar("context")}
 	json_data, err := json.Marshal(values)
 
-	r, err := req.Post(fmt.Sprintf("https://api.github.com/repos/%s/%s/statuses/%s", getValidatedEnvVar("organisation"), getValidatedEnvVar("app_repo"), getValidatedEnvVar("git_sha")), header, req.BodyJSON(json_data))
+	r, err := req.Post(fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s", getUrl("gh_url", "api.github.com"), getValidatedEnvVar("organisation"), getValidatedEnvVar("app_repo"), getValidatedEnvVar("git_sha")), header, req.BodyJSON(json_data))
 
 	if err != nil {
 		log.Fatal(err)
@@ -47,4 +47,11 @@ func getToken(f string, e string) string {
 	}
 	a := getValidatedEnvVar(e)
 	return a
+}
+
+func getUrl(e, fallback string) string {
+    if value, ok := os.LookupEnv(e); ok {
+        return value
+    }
+    return fallback
 }

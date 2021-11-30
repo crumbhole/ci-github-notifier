@@ -1,5 +1,5 @@
 # ci-github-notifier
-A lightweight container to post the status of a CI task to GitHub, allowing GitHub users to see the status of a PR or Branch. Designed for cloud native workflows (eg [Argo Workflows](https://argoproj.github.io/argo-workflows/), or [Tekton](https://tekton.dev/)), but will run wherever a container can be run.
+A lightweight container to post the status of a CI task to GitHub, allowing GitHub users to see the status of a PR or Branch. Designed for cloud native workflows (eg [Argo Workflows](https://argoproj.github.io/argo-workflows/), or [Tekton](https://tekton.dev/)), but will run wherever a container can be run. Compatible with regular Github and Github Enterprise URLs.
 
 ![CI](https://github.com/sendible-labs/ci-github-notifier/actions/workflows/ci.yaml/badge.svg) ![Code Quality](https://github.com/sendible-labs/ci-github-notifier/actions/workflows/codeql-analysis.yaml/badge.svg) ![Release](https://github.com/sendible-labs/ci-github-notifier/actions/workflows/release.yaml/badge.svg)
 
@@ -28,6 +28,7 @@ Finally we provide Environment Variables that make up the values of the GitHub A
 | `organisation`        | string    | The GitHub organisation/username for the notification. e.g. given https://github.com/sendible-labs/ci-github-notifier, the organisation is "sendible-labs"    |
 | `app_repo`            | string    | The GitHub repo for the notification. e.g. given https://github.com/sendible-labs/ci-github-notifier, the app_repo is "ci-github-notifier"                    |
 | `git_sha`             | string    | The SHA1 of the PR or branch you wish to notify                                                                                                               |
+| `gh_url`              | string    | (OPTIONAL) The URL of the GitHub API. If omitted, will default to `api.github.com`                                                                              |
 
 # Docker run examples
 You are unlikely to want to run these in production using `docker run`, but the following examples give a clear indication of how to execute the container.
@@ -43,6 +44,7 @@ docker run \
     -e organisation=sendible-labs \
     -e app_repo="ci-github-notifier" \
     -e git_sha="123abc123abc" \
+    -e gh_url="api.mydomain.biz" \
     ghcr.io/sendible-labs/ci-github-notifier:stable
 ```
 
@@ -57,6 +59,7 @@ docker run \
     -e organisation=sendible-labs \
     -e app_repo="ci-github-notifier" \
     -e git_sha="123abc123abc" \
+    -e gh_url="api.mydomain.biz" \
     -v /path/to/file:/tmp/access_token \
     ghcr.io/sendible-labs/ci-github-notifier:stable
 ```
