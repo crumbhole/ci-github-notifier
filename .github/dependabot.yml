@@ -4,7 +4,7 @@ updates:
 
   # Maintain dependencies for Golang
   - package-ecosystem: "gomod"
-    directory: "/"
+    directory: "/ci-github-notifier"
     schedule:
       interval: "daily"
     commit-message:
