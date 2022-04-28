@@ -50,8 +50,8 @@ func getToken(f string, e string) string {
 }
 
 func getUrl(e, fallback string) string {
-    if value, ok := os.LookupEnv(e); ok {
-        return value
-    }
-    return fallback
+	if value, ok := os.LookupEnv(e); ok {
+		return value
+	}
+	return fallback
 }
