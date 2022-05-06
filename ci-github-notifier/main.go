@@ -17,9 +17,9 @@ func main() {
 	}
 
 	values := map[string]string{"state": getValidatedEnvVar("state"), "target_url": getValidatedEnvVar("target_url"), "description": getValidatedEnvVar("description"), "context": getValidatedEnvVar("context")}
-	json_data, err := json.Marshal(values)
+	jsonData, err := json.Marshal(values)
 
-	r, err := req.Post(fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s", getUrl("gh_url", "api.github.com"), getValidatedEnvVar("organisation"), getValidatedEnvVar("app_repo"), getValidatedEnvVar("git_sha")), header, req.BodyJSON(json_data))
+	r, err := req.Post(fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s", getUrl("gh_url", "api.github.com"), getValidatedEnvVar("organisation"), getValidatedEnvVar("app_repo"), getValidatedEnvVar("git_sha")), header, req.BodyJSON(jsonData))
 
 	if err != nil {
 		log.Fatal(err)
