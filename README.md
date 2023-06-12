@@ -9,7 +9,7 @@ First, we provide the necessary values for the GitHub status API:
 
 | Environment Variable  | Type      | Description                                                                                                                                       |
 |---------------------- |---------- |-------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `state`               | string    | The state of the status. Can be one of pending, success, error, or failure.                                                                       |
+| `state`               | string    | The state of the status. Can be one of `pending`, `success`, `error`, or `failure` ([Github Docs](https://docs.github.com/en/rest/commits/statuses?apiVersion=2022-11-28#about-commit-statuses)).                                                                       |
 | `target_url`          | string    | The target URL to associate with this status. This URL will be linked from the GitHub UI to allow users to easily see the ‘source’ of the Status. |
 | `description`         | string    | A short description of the status.                                                                                                                |
 | `context`             | string    | A string label to differentiate this status from the status of other systems.                                                                     |
