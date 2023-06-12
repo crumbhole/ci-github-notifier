@@ -66,5 +66,3 @@ docker run \
 
 # Argo Workflows example
 A simple Argo Workflows template can be found in the examples directory.
-
-If you're getting annoyed that the Workflow's URL changes after being archived, you may be interested in the [Argo Workflows URL Finder](https://github.com/sendible-labs/argo-workflows-url-finder)
