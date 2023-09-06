@@ -1,4 +1,4 @@
-FROM golang:alpine AS builder
+FROM golang:1.20.7-alpine AS builder
 WORKDIR $GOPATH/src/sendible.com/sendible-labs
 
 COPY ci-github-notifier .
