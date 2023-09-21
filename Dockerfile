@@ -1,5 +1,5 @@
 FROM golang:1.21.1-alpine AS builder
-WORKDIR $GOPATH/src/crumbhole/sendible-labs
+WORKDIR $GOPATH/src/crumbhole
 
 COPY ci-github-notifier .
 
