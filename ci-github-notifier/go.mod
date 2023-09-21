@@ -1,5 +1,5 @@
-module github.com/sendible-labs/ci-github-notifier
+module github.com/crumbhole/ci-github-notifier
 
-go 1.20
+go 1.21
 
 require github.com/imroc/req v0.3.0 // indirect
