@@ -1,7 +1,7 @@
 # ci-github-notifier
 A lightweight container to post the status of a CI task to GitHub, allowing GitHub users to see the status of a PR or Branch. Designed for cloud native workflows (eg [Argo Workflows](https://argoproj.github.io/argo-workflows/), or [Tekton](https://tekton.dev/)), but will run wherever a container can be run. Compatible with regular Github and Github Enterprise URLs.
 
-![CI](https://github.com/sendible-labs/ci-github-notifier/actions/workflows/ci.yaml/badge.svg) ![Code Quality](https://github.com/sendible-labs/ci-github-notifier/actions/workflows/codeql-analysis.yaml/badge.svg) ![Release](https://github.com/sendible-labs/ci-github-notifier/actions/workflows/release.yaml/badge.svg)
+![CI](https://github.com/crumbhole/ci-github-notifier/actions/workflows/ci.yaml/badge.svg) ![Code Quality](https://github.com/crumbhole/ci-github-notifier/actions/workflows/codeql-analysis.yaml/badge.svg) ![Release](https://github.com/crumbhole/ci-github-notifier/actions/workflows/release.yaml/badge.svg)
 
 # Environment Variables
 We pass key information to the container using environment variables.
@@ -25,8 +25,8 @@ Finally we provide Environment Variables that make up the values of the GitHub A
 
 | Environment Variable  | Type      | Description                                                                                                                                       |
 |---------------------- |---------- |-------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `organisation`        | string    | The GitHub organisation/username for the notification. e.g. given https://github.com/sendible-labs/ci-github-notifier, the organisation is "sendible-labs"    |
-| `app_repo`            | string    | The GitHub repo for the notification. e.g. given https://github.com/sendible-labs/ci-github-notifier, the app_repo is "ci-github-notifier"                    |
+| `organisation`        | string    | The GitHub organisation/username for the notification. e.g. given https://github.com/crumbhole/ci-github-notifier, the organisation is "crumbhole"    |
+| `app_repo`            | string    | The GitHub repo for the notification. e.g. given https://github.com/crumbhole/ci-github-notifier, the app_repo is "ci-github-notifier"                    |
 | `git_sha`             | string    | The SHA1 of the PR or branch you wish to notify                                                                                                               |
 | `gh_url`              | string    | (OPTIONAL) The URL of the GitHub API. If omitted, will default to `api.github.com`                                                                              |
 
@@ -41,11 +41,11 @@ docker run \
     -e description="This is an example description" \
     -e context="Example context" \
     -e access_token="123ABC123ABC" \
-    -e organisation=sendible-labs \
+    -e organisation=crumbhole \
     -e app_repo="ci-github-notifier" \
     -e git_sha="123abc123abc" \
     -e gh_url="api.mydomain.biz" \
-    ghcr.io/sendible-labs/ci-github-notifier:stable
+    ghcr.io/crumbhole/ci-github-notifier:stable
 ```
 
 ## Mounting tokenFile
@@ -56,12 +56,12 @@ docker run \
     -e description="This is an example description" \
     -e context="Example context" \
     -e tokenFile="/tmp/access_token" \
-    -e organisation=sendible-labs \
+    -e organisation=crumbhole \
     -e app_repo="ci-github-notifier" \
     -e git_sha="123abc123abc" \
     -e gh_url="api.mydomain.biz" \
     -v /path/to/file:/tmp/access_token \
-    ghcr.io/sendible-labs/ci-github-notifier:stable
+    ghcr.io/crumbhole/ci-github-notifier:stable
 ```
 
 # Argo Workflows example
