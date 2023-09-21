@@ -51,7 +51,7 @@ spec:
       - name: access_token
       - name: organisation
     container:
-      image: ghcr.io/sendible-labs/ci-github-notifier:stable
+      image: ghcr.io/crumbhole/ci-github-notifier:stable
       imagePullPolicy: Always
       env:
         - name: state
