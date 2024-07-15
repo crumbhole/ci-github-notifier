@@ -15,4 +15,5 @@ FROM scratch
 COPY --from=builder /go/bin/ci-github-notifier /go/bin/ci-github-notifier
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
+EXPOSE 8080
 ENTRYPOINT ["/go/bin/ci-github-notifier"]
