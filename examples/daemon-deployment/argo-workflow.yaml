@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ci-github-notifier-example-
+  namespace: ci
+spec:
+  entrypoint: main
+  serviceAccountName: ci
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: post-pending
+            template: ci-github-notifier
+            arguments:
+              parameters:
+                - name: base_url
+                  value: "http://ci-github-notifier:8080/notify"
+                - name: state
+                  value: pending
+
+    - name: ci-github-notifier
+      inputs:
+        parameters:
+          - name: base_url
+          - name: state
+      http:
+        url: "{{inputs.parameters.base_url}}?state={{inputs.parameters.state}}"
+        successCondition: "response.body contains \"200\""
