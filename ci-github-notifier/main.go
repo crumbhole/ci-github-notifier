@@ -3,12 +3,12 @@ package main
 import (
 	"encoding/json"
 	"github.com/imroc/req"
+	"strings"
     "flag"
     "fmt"
     "log"
     "net/http"
     "os"
-	"strings"
 )
 
 func main() {
