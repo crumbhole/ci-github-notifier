@@ -66,3 +66,6 @@ docker run \
 
 # Argo Workflows example
 A simple Argo Workflows template can be found in the examples directory.
+
+# Run as a daemon
+You may wish to run as a permanent service in your Kubernetes cluster and then call the service using curl or similar to send your message. An example of how to do this can be found in the examples directory.

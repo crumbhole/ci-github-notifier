@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ci-github-notifier
+  name: ci-github-notifier
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: ci-github-notifier
+  template:
+    metadata:
+      labels:
+        app: ci-github-notifier
+    spec:
+      containers:
+      - image: ghcr.io/crumbhole/ci-github-notifier
+        imagePullPolicy: Always
+        name: ci-github-notifier
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: 20Mi
+            cpu: 10m
+        env:
+        - name: WEBSERVER_MODE
+          value: "true"
+        - name: access_token
+          valueFrom:
+            secretKeyRef:
+              name: ci-github-notifier-access-token
+              key: access_token
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app"
+                  operator: In
+                  values:
+                  - ci-github-notifier
+              topologyKey: "topology.kubernetes.io/zone"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-github-notifier-access-token
+type: Opaque
+data:
+  access_token: <base64 encoded access token>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ci-github-notifier
+  name: ci-github-notifier
+spec:
+  ports:
+  - name: ci-github-notifier
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: ci-github-notifier
+  type: ClusterIP

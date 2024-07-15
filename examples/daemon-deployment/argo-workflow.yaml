@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ci-github-notifier-example-
+spec:
+  entrypoint: main
+  serviceAccountName: valid-sa-name-here #https://argo-workflows.readthedocs.io/en/latest/http-template/#argo-agent
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: post-pending
+            template: ci-github-notifier
+            arguments:
+              parameters:
+                - name: base_url
+                  value: "http://ci-github-notifier.ci-github-notifier.svc.cluster.local:8080/notify"
+                - name: git_sha
+                  value: "12345"
+                - name: state
+                  value: "pending"
+                - name: context
+                  value: "UI Checks"
+                - name: description
+                  value: "In progress — This check has started..."
+                - name: target_url
+                  value: "https://pipekit.io/"
+
+    - name: ci-github-notifier
+      inputs:
+        parameters:
+          - name: base_url
+          - name: git_sha
+          - name: state
+          - name: context
+          - name: description
+          - name: target_url
+      http:
+        url: "{{inputs.parameters.base_url}}?app_repo=foo&organisation=bar&git_sha={{inputs.parameters.git_sha}}&state={{inputs.parameters.state}}&context={{inputs.parameters.context}}&description={{inputs.parameters.description}}&target_url={{inputs.parameters.target_url}}"
+        successCondition: "response.body contains \"200\""
