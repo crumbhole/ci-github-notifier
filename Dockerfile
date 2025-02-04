@@ -4,6 +4,7 @@ WORKDIR $GOPATH/src/crumbhole
 COPY ci-github-notifier .
 
 # Fetch dependencies
+RUN go mod tidy
 RUN go mod download
 RUN go mod verify
 

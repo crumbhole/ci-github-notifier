@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/imroc/req"
 	"io/ioutil"
 	"log"
@@ -12,8 +13,14 @@ import (
 func main() {
 	fmt.Printf("Notifiying Github: %s:%s\n", getValidatedEnvVar("context"), getValidatedEnvVar("state"))
 
+	token := getToken(os.Getenv("tokenFile"), "access_token")
+	authPrefix := "token"
+	if isJWT(token) {
+		authPrefix = "Bearer"
+	}
+
 	header := req.Header{
-		"Authorization": fmt.Sprintf("token %s", getToken(os.Getenv("tokenFile"), "access_token")),
+		"Authorization": fmt.Sprintf("%s %s", authPrefix, token),
 	}
 
 	values := map[string]string{"state": getValidatedEnvVar("state"), "target_url": getValidatedEnvVar("target_url"), "description": getValidatedEnvVar("description"), "context": getValidatedEnvVar("context")}
@@ -54,4 +61,12 @@ func getUrl(e, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// Checks if the given string is at least a structurally valid JWT. It does not verify signatures or claims
+func isJWT(tokenString string) bool {
+	parser := jwt.NewParser()
+	// give jwt.MapClaims as the claims type, but any valid claims type works
+	_, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})
+	return err == nil
 }
