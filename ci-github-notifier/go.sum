@@ -5,3 +5,4 @@ github.com/imroc/req v0.3.0/go.mod h1:F+NZ+2EFSo6EFXdeIbpfE9hcC233id70kf0byW97Ca
 github.com/imroc/req v0.3.2 h1:M/JkeU6RPmX+WYvT2vaaOL0K+q8ufL5LxwvJc4xeB4o=
 github.com/imroc/req v0.3.2/go.mod h1:F+NZ+2EFSo6EFXdeIbpfE9hcC233id70kf0byW97Caw=
 github.com/imroc/req/v3 v3.43.4/go.mod h1:SQIz5iYop16MJxbo8ib+4LnostGCok8NQf8ToyQc2xA=
+github.com/imroc/req/v3 v3.52.2/go.mod h1:dBGsDloOSZJcFs6PnTjZXYBJK70OXbZpizHBLNqcH2k=
