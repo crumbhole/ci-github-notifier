@@ -1,13 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/imroc/req"
+	"github.com/imroc/req/v3"
 )
 
 func main() {
@@ -19,19 +18,32 @@ func main() {
 		authPrefix = "Bearer"
 	}
 
-	header := req.Header{
-		"Authorization": fmt.Sprintf("%s %s", authPrefix, token),
+	// Create a client instead of using static methods
+	client := req.C()
+
+	values := map[string]string{
+		"state":       getValidatedEnvVar("state"),
+		"target_url":  getValidatedEnvVar("target_url"),
+		"description": getValidatedEnvVar("description"),
+		"context":     getValidatedEnvVar("context"),
 	}
 
-	values := map[string]string{"state": getValidatedEnvVar("state"), "target_url": getValidatedEnvVar("target_url"), "description": getValidatedEnvVar("description"), "context": getValidatedEnvVar("context")}
-	jsonData, err := json.Marshal(values)
+	// Build the URL
+	url := fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s",
+		getUrl("gh_url", "api.github.com"),
+		getValidatedEnvVar("organisation"),
+		getValidatedEnvVar("app_repo"),
+		getValidatedEnvVar("git_sha"))
 
-	r, err := req.Post(fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s", getUrl("gh_url", "api.github.com"), getValidatedEnvVar("organisation"), getValidatedEnvVar("app_repo"), getValidatedEnvVar("git_sha")), header, req.BodyJSON(jsonData))
+	resp, err := client.R().
+		SetHeader("Authorization", fmt.Sprintf("%s %s", authPrefix, token)).
+		SetBodyJsonMarshal(values).
+		Post(url)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-	resp := r.Response()
+
 	fmt.Println("HTTP response from github:", resp.StatusCode)
 }
 
