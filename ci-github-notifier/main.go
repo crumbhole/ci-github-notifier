@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/imroc/req"
-	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/imroc/req"
 )
 
 func main() {
@@ -46,7 +46,7 @@ func getValidatedEnvVar(e string) string {
 
 func getToken(f string, e string) string {
 	if os.Getenv(e) == "" {
-		data, err := ioutil.ReadFile(f)
+		data, err := os.ReadFile(f)
 		if err != nil {
 			fmt.Println("No tokenFile found. Falling back to Environment Variable")
 		}
