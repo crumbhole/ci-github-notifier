@@ -1,4 +1,4 @@
-FROM golang:1.24.4-alpine AS builder
+FROM golang:1.25.3-alpine AS builder
 WORKDIR $GOPATH/src/crumbhole
 
 COPY ci-github-notifier .
