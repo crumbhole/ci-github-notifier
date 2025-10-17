@@ -42,9 +42,15 @@ func main() {
 
 	if err != nil {
 		log.Fatal(err)
+		os.Exit(1)
 	}
 
 	fmt.Println("HTTP response from github:", resp.StatusCode)
+
+	if ! resp.IsSuccessState() {
+		log.Fatal(resp)
+		os.Exit(1)
+	}
 }
 
 func getValidatedEnvVar(e string) string {
