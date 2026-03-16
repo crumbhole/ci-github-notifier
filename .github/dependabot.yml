@@ -1,0 +1,3 @@
+# Disable Dependabot - this repo uses Renovate for dependency management
+version: 2
+updates: []
