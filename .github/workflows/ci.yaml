@@ -8,6 +8,7 @@ on:
 
 jobs:
   Lint:
+    name: Lint and test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -25,6 +26,8 @@ jobs:
           # Pinned so a new golangci-lint release cannot fail CI without
           # a corresponding change here. Bump alongside the local tool.
           version: v2.13.2
+      - name: Test
+        run: make test
 
   Deploy:
     needs: Lint
