@@ -13,3 +13,6 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Compiled binary, produced by `make build` / `go build ./...`
+/ci-github-notifier/ci-github-notifier

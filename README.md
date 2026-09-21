@@ -66,3 +66,18 @@ docker run \
 
 # Argo Workflows example
 A simple Argo Workflows template can be found in the examples directory.
+
+# Development
+
+Go sources are linted with [golangci-lint](https://golangci-lint.run/) against
+`.golangci.yaml`. The same configuration runs locally and in CI, so a clean
+`make lint` means a clean CI lint job.
+
+```bash
+make lint    # golangci-lint run ./...
+make build   # lint, then go build ./...
+make test    # go test ./...
+```
+
+`make lint` needs golangci-lint v2 on your `PATH`; CI pins the version it
+installs in `.github/workflows/ci.yaml`. Keep the two in step when bumping.
