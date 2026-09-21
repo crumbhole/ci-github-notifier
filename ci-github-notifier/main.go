@@ -14,14 +14,17 @@ import (
 func main() {
 	fmt.Printf("Notifiying Github: %s:%s\n", getValidatedEnvVar("context"), getValidatedEnvVar("state"))
 
-	token := getToken(os.Getenv("tokenFile"), "access_token")
-	authPrefix := "token"
-	if isJWT(token) {
-		authPrefix = "Bearer"
-	}
-
 	// Create a client instead of using static methods
 	client := req.C()
+
+	apiHost := getURL("gh_url", "api.github.com")
+	organisation := getValidatedEnvVar("organisation")
+	appRepo := getValidatedEnvVar("app_repo")
+
+	token, authPrefix, authErr := resolveToken(client, apiHost, organisation, appRepo)
+	if authErr != nil {
+		log.Fatal(authErr)
+	}
 
 	values := map[string]string{
 		"state":       getValidatedEnvVar("state"),
@@ -32,10 +35,7 @@ func main() {
 
 	// Build the URL
 	url := fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s",
-		getURL("gh_url", "api.github.com"),
-		getValidatedEnvVar("organisation"),
-		getValidatedEnvVar("app_repo"),
-		getValidatedEnvVar("git_sha"))
+		apiHost, organisation, appRepo, getValidatedEnvVar("git_sha"))
 
 	resp, err := client.R().
 		SetHeader("Authorization", fmt.Sprintf("%s %s", authPrefix, token)).
@@ -92,4 +92,28 @@ func isJWT(tokenString string) bool {
 	// give jwt.MapClaims as the claims type, but any valid claims type works
 	_, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})
 	return err == nil
+}
+
+// resolveToken picks the credential to authenticate with. GitHub App
+// credentials win when configured; otherwise the access_token/tokenFile
+// pair is used exactly as before.
+func resolveToken(c *req.Client, apiHost, owner, repo string) (string, string, error) {
+	useApp, err := appAuthConfigured()
+	if err != nil {
+		return "", "", err
+	}
+
+	if useApp {
+		token, err := installationToken(c, apiHost, owner, repo)
+		if err != nil {
+			return "", "", err
+		}
+		return token, "Bearer", nil
+	}
+
+	token := getToken(os.Getenv("tokenFile"), "access_token")
+	if isJWT(token) {
+		return token, "Bearer", nil
+	}
+	return token, "token", nil
 }

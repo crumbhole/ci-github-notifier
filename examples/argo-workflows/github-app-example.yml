@@ -1,0 +1,92 @@
+apiVersion: argoproj.io/v1alpha1
+kind: workflowTemplate
+metadata:
+  generateName: github-app-ci-github-notifier
+  annotations:
+    workflows.argoproj.io/description: >-
+      Notify GitHub of the current state of a CI job, authenticating as a
+      GitHub App rather than with a personal access token.
+
+      The App's private key is mounted from a Kubernetes secret. The tool
+      exchanges it for a short-lived installation token at run time, so no
+      long-lived credential is stored in the workflow.
+
+      Create the secret with:
+      kubectl create secret generic github-app-key --from-file=app.pem=/path/to/app.pem
+    workflows.argoproj.io/maintainer: '@tim_sendible'
+    workflows.argoproj.io/tags: github
+    workflows.argoproj.io/version: '>= 2.9.0'
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    dag:
+      tasks:
+        - name: notify-github-pending
+          template: github-notifier
+          arguments:
+            parameters:
+              - name: app_repo
+                value: ""
+              - name: git_sha
+                value: ""
+              - name: state
+                value: "pending"
+              - name: target_url
+                value: "https://argo-workflows.mydomain/biz/workflows/{{workflow.namespace}}/{{workflow.name}}"
+              - name: context
+                value: ""
+              - name: description
+                value: ""
+              - name: organisation
+                value: ""
+              - name: app_id
+                value: ""
+
+  - name: github-notifier
+    inputs:
+      parameters:
+      - name: state
+      - name: target_url
+      - name: description
+      - name: context
+      - name: app_repo
+      - name: git_sha
+      - name: app_id
+      - name: organisation
+    volumes:
+      - name: github-app-key
+        secret:
+          secretName: github-app-key
+    container:
+      image: ghcr.io/crumbhole/ci-github-notifier:stable
+      imagePullPolicy: Always
+      volumeMounts:
+        - name: github-app-key
+          mountPath: /secrets
+          readOnly: true
+      env:
+        - name: state
+          value: "{{inputs.parameters.state}}"
+        - name: target_url
+          value: "{{inputs.parameters.target_url}}"
+        - name: description
+          value: "{{inputs.parameters.description}}"
+        - name: context
+          value: "{{inputs.parameters.context}}"
+        - name: app_id
+          value: "{{inputs.parameters.app_id}}"
+        - name: app_private_key_file
+          value: /secrets/app.pem
+        - name: organisation
+          value: "{{inputs.parameters.organisation}}"
+        - name: app_repo
+          value: "{{inputs.parameters.app_repo}}"
+        - name: git_sha
+          value: "{{inputs.parameters.git_sha}}"
+      resources:
+        requests:
+          memory: 8Mi
+          cpu: 1m
+      #Timeout after 5 minutes
+      activeDeadlineSeconds: 300
