@@ -1,3 +1,5 @@
+// Command ci-github-notifier posts a commit status to the GitHub statuses
+// API, so a CI system can report build state back to a pull request.
 package main
 
 import (
@@ -30,7 +32,7 @@ func main() {
 
 	// Build the URL
 	url := fmt.Sprintf("https://%s/repos/%s/%s/statuses/%s",
-		getUrl("gh_url", "api.github.com"),
+		getURL("gh_url", "api.github.com"),
 		getValidatedEnvVar("organisation"),
 		getValidatedEnvVar("app_repo"),
 		getValidatedEnvVar("git_sha"))
@@ -42,14 +44,12 @@ func main() {
 
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	fmt.Println("HTTP response from github:", resp.StatusCode)
 
-	if ! resp.IsSuccessState() {
+	if !resp.IsSuccessState() {
 		log.Fatal(resp)
-		os.Exit(1)
 	}
 }
 
@@ -64,24 +64,29 @@ func getValidatedEnvVar(e string) string {
 
 func getToken(f string, e string) string {
 	if os.Getenv(e) == "" {
+		// The token path comes from the tokenFile env var: operator-supplied
+		// configuration, not attacker input, so the taint gosec reports here
+		// (G304 file inclusion, G703 path traversal) is by design.
+		// #nosec G304 G703
 		data, err := os.ReadFile(f)
 		if err != nil {
 			fmt.Println("No tokenFile found. Falling back to Environment Variable")
+		} else if err := os.Setenv(e, string(data)); err != nil {
+			log.Fatalf("Could not set %s: %v", e, err)
 		}
-		os.Setenv(e, string(data))
 	}
 	a := getValidatedEnvVar(e)
 	return a
 }
 
-func getUrl(e, fallback string) string {
+func getURL(e, fallback string) string {
 	if value, ok := os.LookupEnv(e); ok {
 		return value
 	}
 	return fallback
 }
 
-// Checks if the given string is at least a structurally valid JWT. It does not verify signatures or claims
+// Checks if the given string is at least a structurally valid JWT. It does not verify signatures or claims.
 func isJWT(tokenString string) bool {
 	parser := jwt.NewParser()
 	// give jwt.MapClaims as the claims type, but any valid claims type works
