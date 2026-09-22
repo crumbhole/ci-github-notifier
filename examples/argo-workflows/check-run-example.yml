@@ -1,5 +1,5 @@
 apiVersion: argoproj.io/v1alpha1
-kind: workflowTemplate
+kind: WorkflowTemplate
 metadata:
   generateName: check-run-ci-github-notifier
   annotations:
@@ -15,7 +15,7 @@ metadata:
       authenticates with an App private key mounted from a secret. Create it
       with:
       kubectl create secret generic github-app-key --from-file=app.pem=/path/to/app.pem
-    workflows.argoproj.io/maintainer: '@tim_sendible'
+    workflows.argoproj.io/maintainer: '@Joibel'
     workflows.argoproj.io/tags: github
     workflows.argoproj.io/version: '>= 2.9.0'
 spec:

@@ -124,7 +124,7 @@ func resolveToken(c *req.Client, apiHost, owner, repo string) (string, string, e
 	}
 
 	if useApp {
-		token, err := installationToken(c, apiHost, owner, repo, map[string]string{"statuses": "write"})
+		token, err := installationToken(c, apiHost, owner, repo, tokenPermissions())
 		if err != nil {
 			return "", "", err
 		}

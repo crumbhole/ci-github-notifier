@@ -9,6 +9,9 @@ import (
 	"github.com/imroc/req/v3"
 )
 
+// apiChecks is the api value selecting the check runs API.
+const apiChecks = "checks"
+
 // checkRunState maps the tool's state onto the check run API's split of
 // status and conclusion. error has no check run equivalent, so it
 // reports as a failure, which is how the statuses UI already renders it.
@@ -135,7 +138,7 @@ func writeCheckRunID(id int64) error {
 
 // validateChecksMode refuses checks mode without App credentials.
 func validateChecksMode() error {
-	if os.Getenv("api") != "checks" {
+	if os.Getenv("api") != apiChecks {
 		return nil
 	}
 
@@ -153,5 +156,15 @@ func validateChecksMode() error {
 // status. statuses stays the default: a personal access token cannot
 // create check runs, so switching would break every existing caller.
 func useChecks() bool {
-	return os.Getenv("api") == "checks"
+	return os.Getenv("api") == apiChecks
+}
+
+// tokenPermissions is the permission the installation token is minted
+// with, which follows the API being used: a token scoped to statuses
+// cannot write a check run, and vice versa.
+func tokenPermissions() map[string]string {
+	if useChecks() {
+		return map[string]string{"checks": "write"}
+	}
+	return map[string]string{"statuses": "write"}
 }

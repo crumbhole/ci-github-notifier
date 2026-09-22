@@ -274,3 +274,31 @@ func TestUseChecksWhenRequested(t *testing.T) {
 		t.Error("useChecks() = false with api=checks")
 	}
 }
+
+func TestTokenPermissionsFollowTheMode(t *testing.T) {
+	cases := []struct {
+		api  string
+		want string
+	}{
+		{"", "statuses"},
+		{"statuses", "statuses"},
+		// Check runs need checks:write; asking for statuses:write here
+		// would mint a token that cannot do the job.
+		{"checks", "checks"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.api, func(t *testing.T) {
+			t.Setenv("api", c.api)
+
+			perms := tokenPermissions()
+
+			if len(perms) != 1 {
+				t.Fatalf("permissions = %v, want exactly one", perms)
+			}
+			if perms[c.want] != "write" {
+				t.Errorf("permissions = %v, want %s:write", perms, c.want)
+			}
+		})
+	}
+}

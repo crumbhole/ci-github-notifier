@@ -161,7 +161,9 @@ The ID is also printed to stdout. In Argo Workflows the file is read back as an
 output parameter; see `examples/argo-workflows/check-run-example.yml`.
 
 Check runs are only writable by GitHub Apps — a personal access token cannot
-create one, whatever its scopes. `api=checks` without `app_id` and a private key
+create one, whatever its scopes. In `checks` mode the installation token is
+minted with `checks: write` rather than `statuses: write`, so the App needs that
+permission granted. `api=checks` without `app_id` and a private key
 fails at startup rather than letting GitHub reject the request. The App needs
 **Checks: Read and write** in addition to, or instead of, Commit statuses.
 
