@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -239,8 +240,9 @@ func TestAppJWTIsSignedWithRS256AndCarriesAppIDAndWindow(t *testing.T) {
 // requests it saw so tests can assert on paths and Authorization
 // headers, and serves the two-step installation token exchange.
 type appAuthTestServer struct {
-	paths []string
-	auths []string
+	mintBody map[string]any
+	paths    []string
+	auths    []string
 }
 
 func (s *appAuthTestServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -252,6 +254,9 @@ func (s *appAuthTestServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id": 42}`))
 	case strings.HasSuffix(r.URL.Path, "/access_tokens"):
+		if err := json.NewDecoder(r.Body).Decode(&s.mintBody); err != nil {
+			s.mintBody = map[string]any{"decode error": err.Error()}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"token": "ghs_installationtoken"}`))
@@ -279,7 +284,7 @@ func TestInstallationTokenExchangesAppJWTForInstallationToken(t *testing.T) {
 	stub := &appAuthTestServer{}
 	client, host := startAppAuth(t, stub)
 
-	token, err := installationToken(client, host, "crumbhole", "ci-github-notifier")
+	token, err := installationToken(client, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -303,7 +308,7 @@ func TestInstallationTokenReportsAppNotInstalled(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 
-	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier")
+	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
 
 	if err == nil {
 		t.Fatal("installationToken() = nil error, want an error when the App is not installed")
@@ -326,12 +331,40 @@ func TestInstallationTokenReportsRejectedCredentials(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 
-	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier")
+	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
 
 	if err == nil {
 		t.Fatal("installationToken() = nil error, want an error when GitHub rejects the App JWT")
 	}
 	if !strings.Contains(err.Error(), "401") {
 		t.Errorf("error %q does not carry GitHub's status, leaving nothing to diagnose from", err)
+	}
+}
+
+func TestInstallationTokenNarrowsScopeToRepoAndPermissions(t *testing.T) {
+	stub := &appAuthTestServer{}
+	client, host := startAppAuth(t, stub)
+
+	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier",
+		map[string]string{"statuses": "write"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Without these, GitHub mints a token good for every repository the
+	// App is installed on and every permission it holds.
+	repos, ok := stub.mintBody["repositories"].([]any)
+	if !ok || len(repos) != 1 || repos[0] != "ci-github-notifier" {
+		t.Errorf("repositories = %v, want the short name of the target repo only", stub.mintBody["repositories"])
+	}
+	perms, ok := stub.mintBody["permissions"].(map[string]any)
+	if !ok {
+		t.Fatalf("permissions = %v, want an object limiting the token", stub.mintBody["permissions"])
+	}
+	if perms["statuses"] != "write" {
+		t.Errorf("permissions.statuses = %v, want write", perms["statuses"])
+	}
+	if len(perms) != 1 {
+		t.Errorf("permissions = %v, want only what was asked for", perms)
 	}
 }

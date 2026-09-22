@@ -124,6 +124,12 @@ export app_private_key=$(base64 -w0 < app.pem)
 If the App is not installed on the repository you name, the run fails with a
 message saying so rather than a bare HTTP error.
 
+The installation token is requested for the single repository named by
+`organisation`/`app_repo` and for the `statuses: write` permission alone, rather
+than for everything the App holds. If the App is installed across an
+organisation, the token this tool uses still reaches only the one repository it
+is posting to.
+
 # Argo Workflows example
 A simple Argo Workflows template can be found in the examples directory. `simple-example.yml` uses a personal access token; `github-app-example.yml` authenticates as a GitHub App with the private key mounted from a Kubernetes secret.
 

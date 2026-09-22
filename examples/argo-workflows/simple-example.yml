@@ -1,5 +1,5 @@
 apiVersion: argoproj.io/v1alpha1
-kind: workflowTemplate
+kind: WorkflowTemplate
 metadata:
   generateName: simple-ci-github-notifier
   annotations:
@@ -9,7 +9,7 @@ metadata:
       You will need to complete the parameter values in order for this to run successfully.
       In production, we would not recommend hard-coding your GitHub personal access token in this way.
       You could mount a secret and define it using tokenFile, or use something like Hashicorp's Vault Agent Injector.
-    workflows.argoproj.io/maintainer: '@tim_sendible'
+    workflows.argoproj.io/maintainer: '@tico24'
     workflows.argoproj.io/tags: github
     workflows.argoproj.io/version: '>= 2.9.0'
 spec:

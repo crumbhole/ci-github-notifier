@@ -90,7 +90,7 @@ func appJWT(appID string, key *rsa.PrivateKey, now time.Time) (string, error) {
 
 // installationToken mints a short-lived installation access token for
 // owner/repo using the configured GitHub App credentials.
-func installationToken(c *req.Client, apiHost, owner, repo string) (string, error) {
+func installationToken(c *req.Client, apiHost, owner, repo string, permissions map[string]string) (string, error) {
 	key, err := appPrivateKey()
 	if err != nil {
 		return "", err
@@ -109,8 +109,17 @@ func installationToken(c *req.Client, apiHost, owner, repo string) (string, erro
 	var minted struct {
 		Token string `json:"token"`
 	}
+	// Without a body GitHub mints a token good for every repository the
+	// App is installed on and every permission it holds. Narrow it to the
+	// one repo and the one permission this run actually needs.
+	scope := map[string]any{
+		"repositories": []string{repo},
+		"permissions":  permissions,
+	}
+
 	resp, err := c.R().
 		SetHeader("Authorization", "Bearer "+signed).
+		SetBodyJsonMarshal(scope).
 		SetSuccessResult(&minted).
 		Post(fmt.Sprintf("https://%s/app/installations/%d/access_tokens", apiHost, id))
 	if err != nil {
