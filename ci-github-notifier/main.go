@@ -21,9 +21,29 @@ func main() {
 	organisation := getValidatedEnvVar("organisation")
 	appRepo := getValidatedEnvVar("app_repo")
 
+	// Fail before authenticating: checks mode without App credentials
+	// cannot work, and saying so beats a 403 from GitHub.
+	if modeErr := validateChecksMode(); modeErr != nil {
+		log.Fatal(modeErr)
+	}
+
 	token, authPrefix, authErr := resolveToken(client, apiHost, organisation, appRepo)
 	if authErr != nil {
 		log.Fatal(authErr)
+	}
+
+	auth := fmt.Sprintf("%s %s", authPrefix, token)
+
+	if useChecks() {
+		id, checkErr := notifyCheckRun(client, apiHost, auth, organisation, appRepo)
+		if checkErr != nil {
+			log.Fatal(checkErr)
+		}
+		fmt.Println("Check run:", id)
+		if writeErr := writeCheckRunID(id); writeErr != nil {
+			log.Fatal(writeErr)
+		}
+		return
 	}
 
 	values := map[string]string{
@@ -38,7 +58,7 @@ func main() {
 		apiHost, organisation, appRepo, getValidatedEnvVar("git_sha"))
 
 	resp, err := client.R().
-		SetHeader("Authorization", fmt.Sprintf("%s %s", authPrefix, token)).
+		SetHeader("Authorization", auth).
 		SetBodyJsonMarshal(values).
 		Post(url)
 

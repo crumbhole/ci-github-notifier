@@ -33,6 +33,15 @@ For a GitHub App, provide `app_id` and one of the two key variables. See [Authen
 
 When `app_id` and a key are both set, App credentials are used and `access_token`/`tokenFile` are ignored. Setting only one of `app_id` and a key is an error rather than a silent fall back to the token, so a half-finished migration fails loudly instead of quietly using the old credential.
 
+By default the commit statuses API is used. To post a check run instead, which
+requires GitHub App credentials, set:
+
+| Environment Variable  | Type      | Description                                                                                                                                       |
+|---------------------- |---------- |-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`                 | string    | (OPTIONAL) `statuses` (default) or `checks`. See [Posting check runs](#posting-check-runs) below                                                  |
+| `check_run_id`        | string    | (OPTIONAL, `checks` only) The ID of an existing check run to update. When unset a new check run is created                                         |
+| `check_run_id_file`   | string    | (OPTIONAL, `checks` only) Path to write the new check run's ID to, so a later pipeline step can pass it back as `check_run_id`                     |
+
 Finally we provide Environment Variables that make up the values of the GitHub API url:
 
 | Environment Variable  | Type      | Description                                                                                                                                       |
@@ -130,8 +139,47 @@ than for everything the App holds. If the App is installed across an
 organisation, the token this tool uses still reaches only the one repository it
 is posting to.
 
+# Posting check runs
+
+Commit statuses are keyed by commit and context, so posting `pending` and later
+`success` against the same `context` replaces the first with the second. Check
+runs are not: they are objects with their own IDs, and posting twice creates two
+of them. A pipeline that reports progress therefore has to carry the ID from the
+first call into the second.
+
+Set `check_run_id_file` on the first call and `check_run_id` on the later one:
+
+```
+# At the start of the build
+check_run_id_file=/tmp/check_run_id state=pending ... ci-github-notifier
+
+# At the end, updating the same check run rather than creating a second
+check_run_id=$(cat /tmp/check_run_id) state=success ... ci-github-notifier
+```
+
+The ID is also printed to stdout. In Argo Workflows the file is read back as an
+output parameter; see `examples/argo-workflows/check-run-example.yml`.
+
+Check runs are only writable by GitHub Apps — a personal access token cannot
+create one, whatever its scopes. `api=checks` without `app_id` and a private key
+fails at startup rather than letting GitHub reject the request. The App needs
+**Checks: Read and write** in addition to, or instead of, Commit statuses.
+
+The tool's four states map onto the check run API's split of `status` and
+`conclusion`:
+
+| `state`   | `status`      | `conclusion` |
+|---------- |-------------- |------------- |
+| `pending` | `in_progress` | -            |
+| `success` | `completed`   | `success`    |
+| `failure` | `completed`   | `failure`    |
+| `error`   | `completed`   | `failure`    |
+
+`context` becomes the check run's `name`, `target_url` becomes `details_url`,
+and `description` becomes `output.summary`.
+
 # Argo Workflows example
-A simple Argo Workflows template can be found in the examples directory. `simple-example.yml` uses a personal access token; `github-app-example.yml` authenticates as a GitHub App with the private key mounted from a Kubernetes secret.
+A simple Argo Workflows template can be found in the examples directory. `simple-example.yml` uses a personal access token; `github-app-example.yml` authenticates as a GitHub App with the private key mounted from a Kubernetes secret. `check-run-example.yml` posts a check run and threads its ID from the pending report through to the final result.
 
 # Development
 
