@@ -21,9 +21,34 @@ func main() {
 	organisation := getValidatedEnvVar("organisation")
 	appRepo := getValidatedEnvVar("app_repo")
 
-	token, authPrefix, authErr := resolveToken(client, apiHost, organisation, appRepo)
+	mode, modeErr := apiMode()
+	if modeErr != nil {
+		log.Fatal(modeErr)
+	}
+
+	// Fail before authenticating: checks mode without App credentials
+	// cannot work, and saying so beats a 403 from GitHub.
+	if appErr := validateChecksMode(mode); appErr != nil {
+		log.Fatal(appErr)
+	}
+
+	token, authPrefix, authErr := resolveToken(client, apiHost, organisation, appRepo, mode)
 	if authErr != nil {
 		log.Fatal(authErr)
+	}
+
+	auth := fmt.Sprintf("%s %s", authPrefix, token)
+
+	if mode == apiChecks {
+		id, checkErr := notifyCheckRun(client, apiHost, auth, organisation, appRepo)
+		if checkErr != nil {
+			log.Fatal(checkErr)
+		}
+		fmt.Println("Check run:", id)
+		if writeErr := writeCheckRunID(id); writeErr != nil {
+			log.Fatal(writeErr)
+		}
+		return
 	}
 
 	values := map[string]string{
@@ -38,7 +63,7 @@ func main() {
 		apiHost, organisation, appRepo, getValidatedEnvVar("git_sha"))
 
 	resp, err := client.R().
-		SetHeader("Authorization", fmt.Sprintf("%s %s", authPrefix, token)).
+		SetHeader("Authorization", auth).
 		SetBodyJsonMarshal(values).
 		Post(url)
 
@@ -97,14 +122,14 @@ func isJWT(tokenString string) bool {
 // resolveToken picks the credential to authenticate with. GitHub App
 // credentials win when configured; otherwise the access_token/tokenFile
 // pair is used exactly as before.
-func resolveToken(c *req.Client, apiHost, owner, repo string) (string, string, error) {
+func resolveToken(c *req.Client, apiHost, owner, repo, mode string) (string, string, error) {
 	useApp, err := appAuthConfigured()
 	if err != nil {
 		return "", "", err
 	}
 
 	if useApp {
-		token, err := installationToken(c, apiHost, owner, repo, map[string]string{"statuses": "write"})
+		token, err := installationToken(c, apiHost, owner, repo, tokenPermissions(mode))
 		if err != nil {
 			return "", "", err
 		}
