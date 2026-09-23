@@ -20,10 +20,20 @@ on:
   schedule:
     - cron: '38 13 * * 4'
 
+# Default to read-only; the analyze job widens this to what CodeQL needs.
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Required to upload the analysis results. Private repositories also
+      # need actions: read, which this public one does not.
+      security-events: write
 
     strategy:
       fail-fast: false
@@ -36,6 +46,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
