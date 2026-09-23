@@ -134,10 +134,10 @@ If the App is not installed on the repository you name, the run fails with a
 message saying so rather than a bare HTTP error.
 
 The installation token is requested for the single repository named by
-`organisation`/`app_repo` and for the `statuses: write` permission alone, rather
-than for everything the App holds. If the App is installed across an
-organisation, the token this tool uses still reaches only the one repository it
-is posting to.
+`organisation`/`app_repo` and for one permission only — `statuses: write`, or
+`checks: write` when `api=checks` — rather than for everything the App holds. If
+the App is installed across an organisation, the token this tool uses still
+reaches only the one repository it is posting to.
 
 # Posting check runs
 
@@ -162,10 +162,10 @@ output parameter; see `examples/argo-workflows/check-run-example.yml`.
 
 Check runs are only writable by GitHub Apps — a personal access token cannot
 create one, whatever its scopes. In `checks` mode the installation token is
-minted with `checks: write` rather than `statuses: write`, so the App needs that
-permission granted. `api=checks` without `app_id` and a private key
-fails at startup rather than letting GitHub reject the request. The App needs
+minted with `checks: write` rather than `statuses: write`, so the App needs
 **Checks: Read and write** in addition to, or instead of, Commit statuses.
+`api=checks` without `app_id` and a private key fails at startup rather than
+letting GitHub reject the request.
 
 The tool's four states map onto the check run API's split of `status` and
 `conclusion`:
