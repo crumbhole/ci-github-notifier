@@ -227,7 +227,7 @@ func TestChecksModeRequiresAppAuth(t *testing.T) {
 	t.Setenv("app_private_key", "")
 	t.Setenv("app_private_key_file", "")
 
-	err := validateChecksMode()
+	err := validateChecksMode(apiChecks)
 
 	if err == nil {
 		t.Fatal("validateChecksMode() = nil error, want a refusal: a PAT cannot create check runs")
@@ -243,7 +243,7 @@ func TestChecksModeAcceptsAppAuth(t *testing.T) {
 	t.Setenv("app_private_key", "cGVt")
 	t.Setenv("app_private_key_file", "")
 
-	if err := validateChecksMode(); err != nil {
+	if err := validateChecksMode(apiChecks); err != nil {
 		t.Errorf("unexpected error when App credentials are configured: %v", err)
 	}
 }
@@ -254,50 +254,74 @@ func TestStatusesModeDoesNotRequireAppAuth(t *testing.T) {
 	t.Setenv("app_private_key", "")
 	t.Setenv("app_private_key_file", "")
 
-	if err := validateChecksMode(); err != nil {
+	if err := validateChecksMode(apiStatuses); err != nil {
 		t.Errorf("unexpected error in statuses mode: %v", err)
-	}
-}
-
-func TestUseChecksDefaultsToStatuses(t *testing.T) {
-	t.Setenv("api", "")
-
-	if useChecks() {
-		t.Error("useChecks() = true with api unset, want statuses to stay the default")
-	}
-}
-
-func TestUseChecksWhenRequested(t *testing.T) {
-	t.Setenv("api", "checks")
-
-	if !useChecks() {
-		t.Error("useChecks() = false with api=checks")
 	}
 }
 
 func TestTokenPermissionsFollowTheMode(t *testing.T) {
 	cases := []struct {
-		api  string
+		mode string
 		want string
 	}{
-		{"", "statuses"},
-		{"statuses", "statuses"},
+		{apiStatuses, "statuses"},
 		// Check runs need checks:write; asking for statuses:write here
 		// would mint a token that cannot do the job.
-		{"checks", "checks"},
+		{apiChecks, "checks"},
 	}
 
 	for _, c := range cases {
-		t.Run(c.api, func(t *testing.T) {
-			t.Setenv("api", c.api)
-
-			perms := tokenPermissions()
+		t.Run(c.mode, func(t *testing.T) {
+			perms := tokenPermissions(c.mode)
 
 			if len(perms) != 1 {
 				t.Fatalf("permissions = %v, want exactly one", perms)
 			}
 			if perms[c.want] != "write" {
 				t.Errorf("permissions = %v, want %s:write", perms, c.want)
+			}
+		})
+	}
+}
+
+func TestAPIModeAcceptsKnownValues(t *testing.T) {
+	cases := map[string]string{
+		"":         apiStatuses, // unset keeps the existing behaviour
+		"statuses": apiStatuses,
+		"checks":   apiChecks,
+	}
+
+	for env, want := range cases {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv("api", env)
+
+			got, err := apiMode()
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != want {
+				t.Errorf("apiMode() = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestAPIModeRejectsUnknownValues(t *testing.T) {
+	// A typo or the wrong case previously fell through to statuses mode.
+	// With App auth that posted a commit status and exited 0, so the
+	// mistake was invisible.
+	for _, env := range []string{"check", "Checks", "CHECKS", "check-runs", "banana"} {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv("api", env)
+
+			_, err := apiMode()
+
+			if err == nil {
+				t.Fatalf("apiMode() = nil error for api=%q, want a refusal rather than a silent fall back to statuses", env)
+			}
+			if !strings.Contains(err.Error(), env) {
+				t.Errorf("error %q does not quote the offending value", err)
 			}
 		})
 	}

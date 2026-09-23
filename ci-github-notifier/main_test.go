@@ -14,7 +14,7 @@ func TestResolveTokenMintsInstallationTokenWhenAppConfigured(t *testing.T) {
 	t.Setenv("access_token", "")
 	t.Setenv("tokenFile", "")
 
-	token, prefix, err := resolveToken(client, host, "crumbhole", "ci-github-notifier")
+	token, prefix, err := resolveToken(client, host, "crumbhole", "ci-github-notifier", apiStatuses)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -34,7 +34,7 @@ func TestResolveTokenFallsBackToAccessToken(t *testing.T) {
 	t.Setenv("access_token", "ghp_classicpat")
 	t.Setenv("tokenFile", "")
 
-	token, prefix, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier")
+	token, prefix, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier", apiStatuses)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -59,7 +59,7 @@ func TestResolveTokenKeepsBearerPrefixForJWTAccessToken(t *testing.T) {
 	t.Setenv("access_token", signed)
 	t.Setenv("tokenFile", "")
 
-	_, prefix, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier")
+	_, prefix, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier", apiStatuses)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -76,7 +76,7 @@ func TestResolveTokenRefusesPartialAppConfig(t *testing.T) {
 	t.Setenv("access_token", "ghp_classicpat")
 	t.Setenv("tokenFile", "")
 
-	_, _, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier")
+	_, _, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier", apiStatuses)
 
 	if err == nil {
 		t.Fatal("resolveToken() = nil error, want a refusal rather than a silent fall back to access_token")
@@ -94,7 +94,7 @@ func TestResolveTokenPrefersAccessTokenOverTokenFile(t *testing.T) {
 	t.Setenv("access_token", "token-from-env")
 	t.Setenv("tokenFile", path)
 
-	got, _, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier")
+	got, _, err := resolveToken(req.C(), "api.github.com", "crumbhole", "ci-github-notifier", apiStatuses)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

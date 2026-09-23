@@ -21,20 +21,25 @@ func main() {
 	organisation := getValidatedEnvVar("organisation")
 	appRepo := getValidatedEnvVar("app_repo")
 
-	// Fail before authenticating: checks mode without App credentials
-	// cannot work, and saying so beats a 403 from GitHub.
-	if modeErr := validateChecksMode(); modeErr != nil {
+	mode, modeErr := apiMode()
+	if modeErr != nil {
 		log.Fatal(modeErr)
 	}
 
-	token, authPrefix, authErr := resolveToken(client, apiHost, organisation, appRepo)
+	// Fail before authenticating: checks mode without App credentials
+	// cannot work, and saying so beats a 403 from GitHub.
+	if appErr := validateChecksMode(mode); appErr != nil {
+		log.Fatal(appErr)
+	}
+
+	token, authPrefix, authErr := resolveToken(client, apiHost, organisation, appRepo, mode)
 	if authErr != nil {
 		log.Fatal(authErr)
 	}
 
 	auth := fmt.Sprintf("%s %s", authPrefix, token)
 
-	if useChecks() {
+	if mode == apiChecks {
 		id, checkErr := notifyCheckRun(client, apiHost, auth, organisation, appRepo)
 		if checkErr != nil {
 			log.Fatal(checkErr)
@@ -117,14 +122,14 @@ func isJWT(tokenString string) bool {
 // resolveToken picks the credential to authenticate with. GitHub App
 // credentials win when configured; otherwise the access_token/tokenFile
 // pair is used exactly as before.
-func resolveToken(c *req.Client, apiHost, owner, repo string) (string, string, error) {
+func resolveToken(c *req.Client, apiHost, owner, repo, mode string) (string, string, error) {
 	useApp, err := appAuthConfigured()
 	if err != nil {
 		return "", "", err
 	}
 
 	if useApp {
-		token, err := installationToken(c, apiHost, owner, repo, tokenPermissions())
+		token, err := installationToken(c, apiHost, owner, repo, tokenPermissions(mode))
 		if err != nil {
 			return "", "", err
 		}

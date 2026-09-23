@@ -9,8 +9,26 @@ import (
 	"github.com/imroc/req/v3"
 )
 
-// apiChecks is the api value selecting the check runs API.
-const apiChecks = "checks"
+// The accepted values of the api variable.
+const (
+	apiStatuses = "statuses"
+	apiChecks   = "checks"
+)
+
+// apiMode returns which GitHub API to post to. Anything that is not
+// exactly statuses or checks is an error rather than a silent fall back:
+// api=Checks, or a typo like api=check, would otherwise post a commit
+// status and exit 0, which is indistinguishable from working.
+func apiMode() (string, error) {
+	switch mode := os.Getenv("api"); mode {
+	case "":
+		return apiStatuses, nil
+	case apiStatuses, apiChecks:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("api %q is not one of %q or %q", mode, apiStatuses, apiChecks)
+	}
+}
 
 // checkRunState maps the tool's state onto the check run API's split of
 // status and conclusion. error has no check run equivalent, so it
@@ -137,8 +155,8 @@ func writeCheckRunID(id int64) error {
 }
 
 // validateChecksMode refuses checks mode without App credentials.
-func validateChecksMode() error {
-	if os.Getenv("api") != apiChecks {
+func validateChecksMode(mode string) error {
+	if mode != apiChecks {
 		return nil
 	}
 
@@ -152,18 +170,11 @@ func validateChecksMode() error {
 	return nil
 }
 
-// useChecks reports whether to post a check run rather than a commit
-// status. statuses stays the default: a personal access token cannot
-// create check runs, so switching would break every existing caller.
-func useChecks() bool {
-	return os.Getenv("api") == apiChecks
-}
-
 // tokenPermissions is the permission the installation token is minted
 // with, which follows the API being used: a token scoped to statuses
 // cannot write a check run, and vice versa.
-func tokenPermissions() map[string]string {
-	if useChecks() {
+func tokenPermissions(mode string) map[string]string {
+	if mode == apiChecks {
 		return map[string]string{"checks": "write"}
 	}
 	return map[string]string{"statuses": "write"}

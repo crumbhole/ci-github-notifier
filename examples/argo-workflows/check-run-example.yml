@@ -53,8 +53,12 @@ spec:
 
         # The check run created above is updated, not replaced: its ID
         # comes back out of notify-pending as an output parameter.
-        - name: notify-result
-          depends: build
+        #
+        # Both outcomes are reported. A bare `depends: build` would only
+        # run on success, leaving a failed build's check run sitting in
+        # progress on the commit for ever.
+        - name: notify-success
+          depends: build.Succeeded
           template: github-notifier
           arguments:
             parameters:
@@ -62,6 +66,18 @@ spec:
                 value: "success"
               - name: description
                 value: "Build passed"
+              - name: check_run_id
+                value: "{{tasks.notify-pending.outputs.parameters.check_run_id}}"
+
+        - name: notify-failure
+          depends: build.Failed || build.Errored
+          template: github-notifier
+          arguments:
+            parameters:
+              - name: state
+                value: "failure"
+              - name: description
+                value: "Build failed"
               - name: check_run_id
                 value: "{{tasks.notify-pending.outputs.parameters.check_run_id}}"
 
