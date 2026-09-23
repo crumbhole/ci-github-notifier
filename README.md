@@ -160,6 +160,12 @@ check_run_id=$(cat /tmp/check_run_id) state=success ... ci-github-notifier
 The ID is also printed to stdout. In Argo Workflows the file is read back as an
 output parameter; see `examples/argo-workflows/check-run-example.yml`.
 
+The image ships an empty, writable `/tmp` for this file. If you run it with a
+read-only root filesystem, mount an `emptyDir` (or similar) there, or point
+`check_run_id_file` at another writable path. If the file can't be written the
+run exits non-zero *after* the check run was created, so a retry would create a
+second one.
+
 Check runs are only writable by GitHub Apps — a personal access token cannot
 create one, whatever its scopes. In `checks` mode the installation token is
 minted with `checks: write` rather than `statuses: write`, so the App needs
