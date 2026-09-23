@@ -40,6 +40,8 @@ spec:
                 value: ""
 
   - name: github-notifier
+    #Timeout after 5 minutes
+    activeDeadlineSeconds: 300
     inputs:
       parameters:
       - name: state
@@ -74,5 +76,3 @@ spec:
         requests:
           memory: 8Mi
           cpu: 1m
-      #Timeout after 5 minutes
-      activeDeadlineSeconds: 300
