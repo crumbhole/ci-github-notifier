@@ -6,12 +6,20 @@ on:
   pull_request:
     branches: [ main ]
 
+# The workflow token needs no more than read access to the repository:
+# nothing here runs authenticated git operations, and the registry
+# push authenticates with CR_PAT rather than GITHUB_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   Lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -32,6 +40,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Set up Docker Buildx
