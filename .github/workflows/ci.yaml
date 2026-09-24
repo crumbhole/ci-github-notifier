@@ -33,7 +33,7 @@ jobs:
           working-directory: ci-github-notifier
           # Pinned so a new golangci-lint release cannot fail CI without
           # a corresponding change here. Bump alongside the local tool.
-          version: v2.13.2
+          version: v2.14.0
       - name: Test
         run: make test
 
