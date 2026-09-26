@@ -204,19 +204,24 @@ func accessToken() (string, error) {
 		return token, nil
 	}
 
+	path := os.Getenv("tokenFile")
+	if path == "" {
+		return "", errors.New("no environment variable called access_token available")
+	}
+
 	// The token path comes from the tokenFile env var: operator-supplied
 	// configuration, not attacker input, so the taint gosec reports here
 	// (G304 file inclusion, G703 path traversal) is by design.
 	// #nosec G304 G703
-	data, err := os.ReadFile(os.Getenv("tokenFile"))
+	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("No tokenFile found. Falling back to Environment Variable")
+		return "", fmt.Errorf("access_token is unset and reading tokenFile failed: %w", err)
 	}
 	// Files written by editors, echo or secret injectors usually end in
 	// a newline, which would otherwise end up in the Authorization header.
 	token := strings.TrimSpace(string(data))
 	if token == "" {
-		return "", errors.New("no environment variable called access_token available")
+		return "", fmt.Errorf("access_token is unset and tokenFile %s is empty", path)
 	}
 	return token, nil
 }

@@ -418,6 +418,20 @@ func TestCredentialsFromEnvRejectsBlankTokenFile(t *testing.T) {
 	}
 }
 
+func TestCredentialsFromEnvReportsUnreadableTokenFile(t *testing.T) {
+	clearCredentialEnv(t)
+	t.Setenv("tokenFile", filepath.Join(t.TempDir(), "absent"))
+
+	_, err := credentialsFromEnv()
+
+	if err == nil {
+		t.Fatal("credentialsFromEnv() = nil error, want an error when tokenFile cannot be read")
+	}
+	if !strings.Contains(err.Error(), "tokenFile") {
+		t.Errorf("error %q does not name tokenFile, hiding why the token is missing", err)
+	}
+}
+
 func TestCredentialsFromEnvPrefersAccessTokenOverTokenFile(t *testing.T) {
 	clearCredentialEnv(t)
 	path := filepath.Join(t.TempDir(), "token")
