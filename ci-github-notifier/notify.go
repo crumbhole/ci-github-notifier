@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -52,7 +53,7 @@ func postStatus(c *req.Client, auth string, n notification) error {
 	fmt.Println("HTTP response from github:", resp.StatusCode)
 
 	if !resp.IsSuccessState() {
-		return fmt.Errorf("posting commit status: github returned %s: %s", resp.Status, resp)
+		return githubError("posting commit status", resp)
 	}
 	return nil
 }
@@ -81,4 +82,18 @@ func isJWT(tokenString string) bool {
 	// give jwt.MapClaims as the claims type, but any valid claims type works
 	_, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})
 	return err == nil
+}
+
+// githubError describes a response GitHub did not accept. GitHub's error
+// bodies carry a one-line reason in message, which is kept; the rest of
+// the body is left out, so the error stays readable in a log line or a
+// workflow node's message.
+func githubError(action string, resp *req.Response) error {
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(resp.Bytes(), &body); err == nil && body.Message != "" {
+		return fmt.Errorf("%s: github returned %s: %s", action, resp.Status, body.Message)
+	}
+	return fmt.Errorf("%s: github returned %s", action, resp.Status)
 }
