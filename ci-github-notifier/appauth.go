@@ -2,71 +2,13 @@ package main
 
 import (
 	"crypto/rsa"
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/imroc/req/v3"
 )
-
-// appAuthConfigured reports whether GitHub App credentials are present.
-// Partial configuration is an error rather than a silent fall back to
-// access_token: it almost always means a half-finished migration, and
-// quietly using the old credential hides that.
-func appAuthConfigured() (bool, error) {
-	id := os.Getenv("app_id")
-	hasKey := os.Getenv("app_private_key") != "" || os.Getenv("app_private_key_file") != ""
-
-	switch {
-	case id == "" && !hasKey:
-		return false, nil
-	case id == "":
-		return false, errors.New("app_private_key or app_private_key_file is set but app_id is not")
-	case !hasKey:
-		return false, errors.New("app_id is set but neither app_private_key nor app_private_key_file is")
-	default:
-		return true, nil
-	}
-}
-
-// appPrivateKey loads the GitHub App private key from app_private_key
-// (base64-encoded PEM) or, failing that, app_private_key_file (raw PEM).
-func appPrivateKey() (*rsa.PrivateKey, error) {
-	pemBytes, err := appPrivateKeyPEM()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := jwt.ParseRSAPrivateKeyFromPEM(pemBytes)
-	if err != nil {
-		return nil, fmt.Errorf("parsing GitHub App private key: %w", err)
-	}
-	return key, nil
-}
-
-// appPrivateKeyPEM returns the raw PEM bytes of the App private key.
-// app_private_key holds it base64-encoded, which keeps a multi-line PEM
-// out of environment variables; app_private_key_file is the raw file.
-func appPrivateKeyPEM() ([]byte, error) {
-	if encoded := os.Getenv("app_private_key"); encoded != "" {
-		pemBytes, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			return nil, fmt.Errorf("decoding app_private_key as base64: %w", err)
-		}
-		return pemBytes, nil
-	}
-
-	path := os.Getenv("app_private_key_file")
-	pemBytes, err := os.ReadFile(path) // #nosec G304 G703 -- operator-supplied configuration.
-	if err != nil {
-		return nil, fmt.Errorf("reading app_private_key_file: %w", err)
-	}
-	return pemBytes, nil
-}
 
 // appJWT builds the short-lived JWT that authenticates as the App
 // itself, which is the credential GitHub accepts for minting an
@@ -89,19 +31,14 @@ func appJWT(appID string, key *rsa.PrivateKey, now time.Time) (string, error) {
 }
 
 // installationToken mints a short-lived installation access token for
-// owner/repo using the configured GitHub App credentials.
-func installationToken(c *req.Client, apiHost, owner, repo string, permissions map[string]string) (string, error) {
-	key, err := appPrivateKey()
+// owner/repo using the GitHub App credentials in creds.
+func installationToken(c *req.Client, creds credentials, apiHost, owner, repo string, permissions map[string]string) (string, error) {
+	signed, err := appJWT(creds.appID, creds.appKey, time.Now())
 	if err != nil {
 		return "", err
 	}
 
-	signed, err := appJWT(os.Getenv("app_id"), key, time.Now())
-	if err != nil {
-		return "", err
-	}
-
-	id, err := installationID(c, apiHost, owner, repo, signed)
+	id, err := installationID(c, creds.appID, apiHost, owner, repo, signed)
 	if err != nil {
 		return "", err
 	}
@@ -135,7 +72,7 @@ func installationToken(c *req.Client, apiHost, owner, repo string, permissions m
 // up keeps installation_id out of the configuration: the App can only
 // act on repos it is installed on, so the ID is derivable from the repo
 // the caller is already naming.
-func installationID(c *req.Client, apiHost, owner, repo, signed string) (int64, error) {
+func installationID(c *req.Client, appID, apiHost, owner, repo, signed string) (int64, error) {
 	var installation struct {
 		ID int64 `json:"id"`
 	}
@@ -147,7 +84,7 @@ func installationID(c *req.Client, apiHost, owner, repo, signed string) (int64, 
 		return 0, fmt.Errorf("looking up GitHub App installation: %w", err)
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return 0, fmt.Errorf("GitHub App %s is not installed on %s/%s", os.Getenv("app_id"), owner, repo)
+		return 0, fmt.Errorf("GitHub App %s is not installed on %s/%s", appID, owner, repo)
 	}
 	if !resp.IsSuccessState() {
 		return 0, fmt.Errorf("looking up GitHub App installation: github returned %s", resp.Status)

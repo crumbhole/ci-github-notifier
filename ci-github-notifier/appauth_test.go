@@ -4,13 +4,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,81 +16,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/imroc/req/v3"
 )
-
-func TestAppAuthConfiguredFalseWhenNothingSet(t *testing.T) {
-	t.Setenv("app_id", "")
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", "")
-
-	configured, err := appAuthConfigured()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if configured {
-		t.Error("appAuthConfigured() = true, want false when no App credentials are set")
-	}
-}
-
-func TestAppAuthConfiguredTrueWithIDAndKey(t *testing.T) {
-	t.Setenv("app_id", "12345")
-	t.Setenv("app_private_key", "cGVt")
-	t.Setenv("app_private_key_file", "")
-
-	configured, err := appAuthConfigured()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !configured {
-		t.Error("appAuthConfigured() = false, want true when app_id and app_private_key are set")
-	}
-}
-
-func TestAppAuthConfiguredTrueWithIDAndKeyFile(t *testing.T) {
-	t.Setenv("app_id", "12345")
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", "/path/to/key.pem")
-
-	configured, err := appAuthConfigured()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !configured {
-		t.Error("appAuthConfigured() = false, want true when app_id and app_private_key_file are set")
-	}
-}
-
-func TestAppAuthConfiguredErrorsWhenIDSetWithoutKey(t *testing.T) {
-	t.Setenv("app_id", "12345")
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", "")
-
-	_, err := appAuthConfigured()
-
-	if err == nil {
-		t.Fatal("appAuthConfigured() = nil error, want an error when app_id is set with no key")
-	}
-	if !strings.Contains(err.Error(), "app_private_key") {
-		t.Errorf("error %q does not name the missing variable app_private_key", err)
-	}
-}
-
-func TestAppAuthConfiguredErrorsWhenKeySetWithoutID(t *testing.T) {
-	t.Setenv("app_id", "")
-	t.Setenv("app_private_key", "cGVt")
-	t.Setenv("app_private_key_file", "")
-
-	_, err := appAuthConfigured()
-
-	if err == nil {
-		t.Fatal("appAuthConfigured() = nil error, want an error when a key is set with no app_id")
-	}
-	if !strings.Contains(err.Error(), "app_id") {
-		t.Errorf("error %q does not name the missing variable app_id", err)
-	}
-}
 
 // testKeyPEM generates a throwaway RSA key and returns it with its
 // PKCS#1 PEM encoding, the form GitHub hands out for App private keys.
@@ -108,99 +30,6 @@ func testKeyPEM(t *testing.T) (*rsa.PrivateKey, []byte) {
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	})
 	return key, pemBytes
-}
-
-func TestAppPrivateKeyFromBase64EnvVar(t *testing.T) {
-	want, pemBytes := testKeyPEM(t)
-	t.Setenv("app_private_key", base64.StdEncoding.EncodeToString(pemBytes))
-	t.Setenv("app_private_key_file", "")
-
-	got, err := appPrivateKey()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !got.Equal(want) {
-		t.Error("appPrivateKey() returned a different key than the one encoded in app_private_key")
-	}
-}
-
-func TestAppPrivateKeyFromFile(t *testing.T) {
-	want, pemBytes := testKeyPEM(t)
-	path := filepath.Join(t.TempDir(), "key.pem")
-	if err := os.WriteFile(path, pemBytes, 0o600); err != nil {
-		t.Fatalf("writing key file: %v", err)
-	}
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", path)
-
-	got, err := appPrivateKey()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !got.Equal(want) {
-		t.Error("appPrivateKey() returned a different key than the one in app_private_key_file")
-	}
-}
-
-func TestAppPrivateKeyPrefersEnvVarOverFile(t *testing.T) {
-	want, pemBytes := testKeyPEM(t)
-	_, otherPEM := testKeyPEM(t)
-	path := filepath.Join(t.TempDir(), "key.pem")
-	if err := os.WriteFile(path, otherPEM, 0o600); err != nil {
-		t.Fatalf("writing key file: %v", err)
-	}
-	t.Setenv("app_private_key", base64.StdEncoding.EncodeToString(pemBytes))
-	t.Setenv("app_private_key_file", path)
-
-	got, err := appPrivateKey()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !got.Equal(want) {
-		t.Error("appPrivateKey() used app_private_key_file, want app_private_key to take precedence")
-	}
-}
-
-func TestAppPrivateKeyErrorsOnNonBase64EnvVar(t *testing.T) {
-	t.Setenv("app_private_key", "-----BEGIN RSA PRIVATE KEY-----")
-	t.Setenv("app_private_key_file", "")
-
-	_, err := appPrivateKey()
-
-	if err == nil {
-		t.Fatal("appPrivateKey() = nil error, want an error for a non-base64 app_private_key")
-	}
-	if !strings.Contains(err.Error(), "app_private_key") {
-		t.Errorf("error %q does not name app_private_key, so will not tell the user what to fix", err)
-	}
-}
-
-func TestAppPrivateKeyErrorsOnMalformedPEM(t *testing.T) {
-	t.Setenv("app_private_key", base64.StdEncoding.EncodeToString([]byte("not a pem")))
-	t.Setenv("app_private_key_file", "")
-
-	_, err := appPrivateKey()
-
-	if err == nil {
-		t.Fatal("appPrivateKey() = nil error, want an error for a malformed PEM")
-	}
-}
-
-func TestAppPrivateKeyErrorsOnMissingFile(t *testing.T) {
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", filepath.Join(t.TempDir(), "absent.pem"))
-
-	_, err := appPrivateKey()
-
-	if err == nil {
-		t.Fatal("appPrivateKey() = nil error, want an error when app_private_key_file does not exist")
-	}
-	if !strings.Contains(err.Error(), "app_private_key_file") {
-		t.Errorf("error %q does not name app_private_key_file", err)
-	}
 }
 
 func TestAppJWTIsSignedWithRS256AndCarriesAppIDAndWindow(t *testing.T) {
@@ -265,26 +94,24 @@ func (s *appAuthTestServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// startAppAuth configures App credentials pointing at a stub GitHub and
-// returns the recorder plus the host to pass as gh_url.
-func startAppAuth(t *testing.T, h http.Handler) (*req.Client, string) {
+// startAppAuth starts a stub GitHub and returns a client for it, the
+// host to use as gh_url, and App credentials to authenticate with.
+func startAppAuth(t *testing.T, h http.Handler) (*req.Client, string, credentials) {
 	t.Helper()
 	srv := httptest.NewTLSServer(h)
 	t.Cleanup(srv.Close)
 
-	_, pemBytes := testKeyPEM(t)
-	t.Setenv("app_id", "12345")
-	t.Setenv("app_private_key", base64.StdEncoding.EncodeToString(pemBytes))
-	t.Setenv("app_private_key_file", "")
+	key, _ := testKeyPEM(t)
+	creds := credentials{appID: "12345", appKey: key}
 
-	return req.C().EnableInsecureSkipVerify(), strings.TrimPrefix(srv.URL, "https://")
+	return req.C().EnableInsecureSkipVerify(), strings.TrimPrefix(srv.URL, "https://"), creds
 }
 
 func TestInstallationTokenExchangesAppJWTForInstallationToken(t *testing.T) {
 	stub := &appAuthTestServer{}
-	client, host := startAppAuth(t, stub)
+	client, host, creds := startAppAuth(t, stub)
 
-	token, err := installationToken(client, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
+	token, err := installationToken(client, creds, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -304,11 +131,11 @@ func TestInstallationTokenExchangesAppJWTForInstallationToken(t *testing.T) {
 }
 
 func TestInstallationTokenReportsAppNotInstalled(t *testing.T) {
-	client, host := startAppAuth(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	client, host, creds := startAppAuth(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 
-	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
+	_, err := installationToken(client, creds, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
 
 	if err == nil {
 		t.Fatal("installationToken() = nil error, want an error when the App is not installed")
@@ -322,7 +149,7 @@ func TestInstallationTokenReportsAppNotInstalled(t *testing.T) {
 }
 
 func TestInstallationTokenReportsRejectedCredentials(t *testing.T) {
-	client, host := startAppAuth(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	client, host, creds := startAppAuth(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/installation") {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id": 42}`))
@@ -331,7 +158,7 @@ func TestInstallationTokenReportsRejectedCredentials(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 
-	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
+	_, err := installationToken(client, creds, host, "crumbhole", "ci-github-notifier", map[string]string{"statuses": "write"})
 
 	if err == nil {
 		t.Fatal("installationToken() = nil error, want an error when GitHub rejects the App JWT")
@@ -343,9 +170,9 @@ func TestInstallationTokenReportsRejectedCredentials(t *testing.T) {
 
 func TestInstallationTokenNarrowsScopeToRepoAndPermissions(t *testing.T) {
 	stub := &appAuthTestServer{}
-	client, host := startAppAuth(t, stub)
+	client, host, creds := startAppAuth(t, stub)
 
-	_, err := installationToken(client, host, "crumbhole", "ci-github-notifier",
+	_, err := installationToken(client, creds, host, "crumbhole", "ci-github-notifier",
 		map[string]string{"statuses": "write"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

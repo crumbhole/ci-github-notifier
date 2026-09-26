@@ -69,26 +69,32 @@ func (c *checkRunRecorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{"id": 987654}`))
 }
 
-func checkRunEnv(t *testing.T) {
+// startCheckRuns starts a stub GitHub recording into rec, and returns a
+// client for it and a pending check run notification aimed at it.
+func startCheckRuns(t *testing.T, rec *checkRunRecorder) (*req.Client, notification) {
 	t.Helper()
-	t.Setenv("state", "pending")
-	t.Setenv("target_url", "https://ci.example.com/run/1")
-	t.Setenv("description", "Build running")
-	t.Setenv("context", "ci/build")
-	t.Setenv("git_sha", "123abc")
-	t.Setenv("check_run_id", "")
-	t.Setenv("check_run_id_file", "")
+	srv := httptest.NewTLSServer(rec)
+	t.Cleanup(srv.Close)
+
+	n := notification{
+		state:        "pending",
+		targetURL:    "https://ci.example.com/run/1",
+		description:  "Build running",
+		context:      "ci/build",
+		apiHost:      strings.TrimPrefix(srv.URL, "https://"),
+		organisation: "crumbhole",
+		repo:         "ci-github-notifier",
+		sha:          "123abc",
+		api:          apiChecks,
+	}
+	return req.C().EnableInsecureSkipVerify(), n
 }
 
 func TestCreateCheckRunPostsMappedFields(t *testing.T) {
 	rec := &checkRunRecorder{}
-	srv := httptest.NewTLSServer(rec)
-	t.Cleanup(srv.Close)
-	checkRunEnv(t)
-	client := req.C().EnableInsecureSkipVerify()
-	host := strings.TrimPrefix(srv.URL, "https://")
+	client, n := startCheckRuns(t, rec)
 
-	id, err := postCheckRun(client, host, "token", "crumbhole", "ci-github-notifier")
+	id, err := postCheckRun(client, "token", n)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -127,16 +133,12 @@ func TestCreateCheckRunPostsMappedFields(t *testing.T) {
 
 func TestUpdateCheckRunPatchesByThreadedID(t *testing.T) {
 	rec := &checkRunRecorder{}
-	srv := httptest.NewTLSServer(rec)
-	t.Cleanup(srv.Close)
-	checkRunEnv(t)
-	t.Setenv("state", "success")
-	t.Setenv("description", "Build passed")
-	t.Setenv("check_run_id", "987654")
-	client := req.C().EnableInsecureSkipVerify()
-	host := strings.TrimPrefix(srv.URL, "https://")
+	client, n := startCheckRuns(t, rec)
+	n.state = "success"
+	n.description = "Build passed"
+	n.checkRunID = 987654
 
-	id, err := notifyCheckRun(client, host, "token", "crumbhole", "ci-github-notifier")
+	id, err := notifyCheckRun(client, "token", n)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -145,7 +147,7 @@ func TestUpdateCheckRunPatchesByThreadedID(t *testing.T) {
 		t.Errorf("id = %d, want the threaded check run id", id)
 	}
 	if rec.method != http.MethodPatch {
-		t.Errorf("method = %s, want PATCH when check_run_id is set", rec.method)
+		t.Errorf("method = %s, want PATCH when a check run id is threaded", rec.method)
 	}
 	if rec.path != "/repos/crumbhole/ci-github-notifier/check-runs/987654" {
 		t.Errorf("path = %s, want the individual check run", rec.path)
@@ -163,13 +165,9 @@ func TestUpdateCheckRunPatchesByThreadedID(t *testing.T) {
 
 func TestNotifyCheckRunCreatesWhenNoIDThreaded(t *testing.T) {
 	rec := &checkRunRecorder{}
-	srv := httptest.NewTLSServer(rec)
-	t.Cleanup(srv.Close)
-	checkRunEnv(t)
-	client := req.C().EnableInsecureSkipVerify()
-	host := strings.TrimPrefix(srv.URL, "https://")
+	client, n := startCheckRuns(t, rec)
 
-	id, err := notifyCheckRun(client, host, "token", "crumbhole", "ci-github-notifier")
+	id, err := notifyCheckRun(client, "token", n)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -178,29 +176,14 @@ func TestNotifyCheckRunCreatesWhenNoIDThreaded(t *testing.T) {
 		t.Errorf("id = %d, want the created check run id", id)
 	}
 	if rec.method != http.MethodPost {
-		t.Errorf("method = %s, want POST when no check_run_id is set", rec.method)
-	}
-}
-
-func TestNotifyCheckRunRejectsNonNumericID(t *testing.T) {
-	checkRunEnv(t)
-	t.Setenv("check_run_id", "not-a-number")
-
-	_, err := notifyCheckRun(req.C(), "api.github.com", "token", "crumbhole", "ci-github-notifier")
-
-	if err == nil {
-		t.Fatal("notifyCheckRun() = nil error, want an error for a non-numeric check_run_id")
-	}
-	if !strings.Contains(err.Error(), "check_run_id") {
-		t.Errorf("error %q does not name check_run_id", err)
+		t.Errorf("method = %s, want POST when no check run id is threaded", rec.method)
 	}
 }
 
 func TestWriteCheckRunIDWritesFileWhenRequested(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "id")
-	t.Setenv("check_run_id_file", path)
 
-	if err := writeCheckRunID(987654); err != nil {
+	if err := writeCheckRunID(path, 987654); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -214,20 +197,13 @@ func TestWriteCheckRunIDWritesFileWhenRequested(t *testing.T) {
 }
 
 func TestWriteCheckRunIDIsANoopWithoutAPath(t *testing.T) {
-	t.Setenv("check_run_id_file", "")
-
-	if err := writeCheckRunID(987654); err != nil {
+	if err := writeCheckRunID("", 987654); err != nil {
 		t.Errorf("unexpected error when no path is configured: %v", err)
 	}
 }
 
 func TestChecksModeRequiresAppAuth(t *testing.T) {
-	t.Setenv("api", "checks")
-	t.Setenv("app_id", "")
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", "")
-
-	err := validateChecksMode(apiChecks)
+	err := validateChecksMode(apiChecks, credentials{accessToken: "ghp_classicpat"})
 
 	if err == nil {
 		t.Fatal("validateChecksMode() = nil error, want a refusal: a PAT cannot create check runs")
@@ -238,23 +214,15 @@ func TestChecksModeRequiresAppAuth(t *testing.T) {
 }
 
 func TestChecksModeAcceptsAppAuth(t *testing.T) {
-	t.Setenv("api", "checks")
-	t.Setenv("app_id", "12345")
-	t.Setenv("app_private_key", "cGVt")
-	t.Setenv("app_private_key_file", "")
+	key, _ := testKeyPEM(t)
 
-	if err := validateChecksMode(apiChecks); err != nil {
+	if err := validateChecksMode(apiChecks, credentials{appID: "12345", appKey: key}); err != nil {
 		t.Errorf("unexpected error when App credentials are configured: %v", err)
 	}
 }
 
 func TestStatusesModeDoesNotRequireAppAuth(t *testing.T) {
-	t.Setenv("api", "statuses")
-	t.Setenv("app_id", "")
-	t.Setenv("app_private_key", "")
-	t.Setenv("app_private_key_file", "")
-
-	if err := validateChecksMode(apiStatuses); err != nil {
+	if err := validateChecksMode(apiStatuses, credentials{accessToken: "ghp_classicpat"}); err != nil {
 		t.Errorf("unexpected error in statuses mode: %v", err)
 	}
 }
@@ -279,49 +247,6 @@ func TestTokenPermissionsFollowTheMode(t *testing.T) {
 			}
 			if perms[c.want] != "write" {
 				t.Errorf("permissions = %v, want %s:write", perms, c.want)
-			}
-		})
-	}
-}
-
-func TestAPIModeAcceptsKnownValues(t *testing.T) {
-	cases := map[string]string{
-		"":         apiStatuses, // unset keeps the existing behaviour
-		"statuses": apiStatuses,
-		"checks":   apiChecks,
-	}
-
-	for env, want := range cases {
-		t.Run(env, func(t *testing.T) {
-			t.Setenv("api", env)
-
-			got, err := apiMode()
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != want {
-				t.Errorf("apiMode() = %q, want %q", got, want)
-			}
-		})
-	}
-}
-
-func TestAPIModeRejectsUnknownValues(t *testing.T) {
-	// A typo or the wrong case previously fell through to statuses mode.
-	// With App auth that posted a commit status and exited 0, so the
-	// mistake was invisible.
-	for _, env := range []string{"check", "Checks", "CHECKS", "check-runs", "banana"} {
-		t.Run(env, func(t *testing.T) {
-			t.Setenv("api", env)
-
-			_, err := apiMode()
-
-			if err == nil {
-				t.Fatalf("apiMode() = nil error for api=%q, want a refusal rather than a silent fall back to statuses", env)
-			}
-			if !strings.Contains(err.Error(), env) {
-				t.Errorf("error %q does not quote the offending value", err)
 			}
 		})
 	}

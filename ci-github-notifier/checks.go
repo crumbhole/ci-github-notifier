@@ -9,27 +9,6 @@ import (
 	"github.com/imroc/req/v3"
 )
 
-// The accepted values of the api variable.
-const (
-	apiStatuses = "statuses"
-	apiChecks   = "checks"
-)
-
-// apiMode returns which GitHub API to post to. Anything that is not
-// exactly statuses or checks is an error rather than a silent fall back:
-// api=Checks, or a typo like api=check, would otherwise post a commit
-// status and exit 0, which is indistinguishable from working.
-func apiMode() (string, error) {
-	switch mode := os.Getenv("api"); mode {
-	case "":
-		return apiStatuses, nil
-	case apiStatuses, apiChecks:
-		return mode, nil
-	default:
-		return "", fmt.Errorf("api %q is not one of %q or %q", mode, apiStatuses, apiChecks)
-	}
-}
-
 // checkRunState maps the tool's state onto the check run API's split of
 // status and conclusion. error has no check run equivalent, so it
 // reports as a failure, which is how the statuses UI already renders it.
@@ -48,13 +27,13 @@ func checkRunState(state string) (string, string, error) {
 
 // postCheckRun creates a check run and returns its ID, which a later
 // invocation needs in order to update it.
-func postCheckRun(c *req.Client, apiHost, auth, owner, repo string) (int64, error) {
-	body, err := checkRunBody()
+func postCheckRun(c *req.Client, auth string, n notification) (int64, error) {
+	body, err := checkRunBody(n)
 	if err != nil {
 		return 0, err
 	}
-	body["name"] = getValidatedEnvVar("context")
-	body["head_sha"] = getValidatedEnvVar("git_sha")
+	body["name"] = n.context
+	body["head_sha"] = n.sha
 
 	var created struct {
 		ID int64 `json:"id"`
@@ -63,7 +42,7 @@ func postCheckRun(c *req.Client, apiHost, auth, owner, repo string) (int64, erro
 		SetHeader("Authorization", auth).
 		SetBodyJsonMarshal(body).
 		SetSuccessResult(&created).
-		Post(fmt.Sprintf("https://%s/repos/%s/%s/check-runs", apiHost, owner, repo))
+		Post(fmt.Sprintf("https://%s/repos/%s/%s/check-runs", n.apiHost, n.organisation, n.repo))
 	if err != nil {
 		return 0, fmt.Errorf("creating check run: %w", err)
 	}
@@ -77,18 +56,18 @@ func postCheckRun(c *req.Client, apiHost, auth, owner, repo string) (int64, erro
 // check run. status and conclusion come from the tool's single state
 // variable; conclusion is omitted while a run is still in progress,
 // which GitHub requires.
-func checkRunBody() (map[string]any, error) {
-	status, conclusion, err := checkRunState(getValidatedEnvVar("state"))
+func checkRunBody(n notification) (map[string]any, error) {
+	status, conclusion, err := checkRunState(n.state)
 	if err != nil {
 		return nil, err
 	}
 
 	body := map[string]any{
 		"status":      status,
-		"details_url": getValidatedEnvVar("target_url"),
+		"details_url": n.targetURL,
 		"output": map[string]any{
-			"title":   getValidatedEnvVar("context"),
-			"summary": getValidatedEnvVar("description"),
+			"title":   n.context,
+			"summary": n.description,
 		},
 	}
 	if conclusion != "" {
@@ -98,26 +77,21 @@ func checkRunBody() (map[string]any, error) {
 }
 
 // notifyCheckRun creates a check run, or updates the one named by
-// check_run_id. Check runs are objects with IDs rather than being keyed
+// n.checkRunID. Check runs are objects with IDs rather than being keyed
 // by commit and context, so a pipeline that reports pending and then a
 // result has to carry the ID from the first call to the second.
-func notifyCheckRun(c *req.Client, apiHost, auth, owner, repo string) (int64, error) {
-	threaded := os.Getenv("check_run_id")
-	if threaded == "" {
-		return postCheckRun(c, apiHost, auth, owner, repo)
+func notifyCheckRun(c *req.Client, auth string, n notification) (int64, error) {
+	if n.checkRunID == 0 {
+		return postCheckRun(c, auth, n)
 	}
-
-	id, err := strconv.ParseInt(threaded, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("check_run_id %q is not a number: %w", threaded, err)
-	}
-	return id, patchCheckRun(c, apiHost, auth, owner, repo, id)
+	return n.checkRunID, patchCheckRun(c, auth, n)
 }
 
 // patchCheckRun updates an existing check run. name and head_sha are
 // fixed at creation, so only the changing fields are sent.
-func patchCheckRun(c *req.Client, apiHost, auth, owner, repo string, id int64) error {
-	body, err := checkRunBody()
+func patchCheckRun(c *req.Client, auth string, n notification) error {
+	id := n.checkRunID
+	body, err := checkRunBody(n)
 	if err != nil {
 		return err
 	}
@@ -125,7 +99,7 @@ func patchCheckRun(c *req.Client, apiHost, auth, owner, repo string, id int64) e
 	resp, err := c.R().
 		SetHeader("Authorization", auth).
 		SetBodyJsonMarshal(body).
-		Patch(fmt.Sprintf("https://%s/repos/%s/%s/check-runs/%d", apiHost, owner, repo, id))
+		Patch(fmt.Sprintf("https://%s/repos/%s/%s/check-runs/%d", n.apiHost, n.organisation, n.repo, id))
 	if err != nil {
 		return fmt.Errorf("updating check run %d: %w", id, err)
 	}
@@ -135,10 +109,10 @@ func patchCheckRun(c *req.Client, apiHost, auth, owner, repo string, id int64) e
 	return nil
 }
 
-// writeCheckRunID writes the check run's ID to check_run_id_file so a
-// later pipeline step can pass it back as check_run_id.
-func writeCheckRunID(id int64) error {
-	path := os.Getenv("check_run_id_file")
+// writeCheckRunID writes the check run's ID to path, which comes from
+// check_run_id_file, so a later pipeline step can pass it back as
+// check_run_id. An empty path writes nothing.
+func writeCheckRunID(path string, id int64) error {
 	if path == "" {
 		return nil
 	}
@@ -155,16 +129,11 @@ func writeCheckRunID(id int64) error {
 }
 
 // validateChecksMode refuses checks mode without App credentials.
-func validateChecksMode(mode string) error {
+func validateChecksMode(mode string, creds credentials) error {
 	if mode != apiChecks {
 		return nil
 	}
-
-	configured, err := appAuthConfigured()
-	if err != nil {
-		return err
-	}
-	if !configured {
+	if !creds.useApp() {
 		return errors.New("api=checks requires GitHub App credentials: only a GitHub App can create check runs, so set app_id and a private key")
 	}
 	return nil
