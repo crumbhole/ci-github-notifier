@@ -187,7 +187,79 @@ The tool's four states map onto the check run API's split of `status` and
 and `description` becomes `output.summary`.
 
 # Argo Workflows example
-A simple Argo Workflows template can be found in the examples directory. `simple-example.yml` uses a personal access token; `github-app-example.yml` authenticates as a GitHub App with the private key mounted from a Kubernetes secret. `check-run-example.yml` posts a check run and threads its ID from the pending report through to the final result.
+A simple Argo Workflows template can be found in the examples directory. To post notifications without starting a pod for each one, see [Argo Workflows executor plugin](#argo-workflows-executor-plugin) below. `simple-example.yml` uses a personal access token; `github-app-example.yml` authenticates as a GitHub App with the private key mounted from a Kubernetes secret. `check-run-example.yml` posts a check run and threads its ID from the pending report through to the final result.
+
+# Argo Workflows executor plugin
+
+Each notification in the examples above starts a pod. The same image can instead
+run as an [Argo Workflows executor plugin](https://argo-workflows.readthedocs.io/en/latest/executor_plugins/):
+a sidecar in each workflow's agent pod that posts a notification each time a
+`plugin:` template runs, without starting a pod for it. The files are in
+`examples/argo-workflows/executor-plugin/`. This has been tested with Argo
+Workflows v4.0.5.
+
+A notification is a template with the same parameters as the environment
+variables above:
+
+```yaml
+- name: github-notifier
+  plugin:
+    ci-github-notifier:
+      state: pending
+      target_url: "https://argo-workflows.mydomain.biz/workflows/{{workflow.namespace}}/{{workflow.name}}"
+      description: Build running
+      context: ci/build
+      organisation: crumbhole
+      app_repo: ci-github-notifier
+      git_sha: "{{workflow.parameters.git_sha}}"
+```
+
+The accepted parameters are `state`, `target_url`, `description`, `context`,
+`organisation`, `app_repo`, `git_sha`, `api` and `check_run_id`. Any other key
+fails the step. That covers typos, and also the credentials and `gh_url`: those
+are configured once on the plugin, so a workflow cannot send the credentials to
+another host. A failed notification fails its step, and the step's message says
+why.
+
+With `api: checks` the step outputs the check run's ID as the `check_run_id`
+output parameter, and a later step passes it back to update the same check run.
+Declare the output on the template as `valueFrom: {supplied: {}}` so Argo lets
+later steps refer to it. `check-run-example.yml` shows the whole thing.
+
+## Installing
+
+1. Enable executor plugins on the workflow controller by setting
+   `ARGO_EXECUTOR_PLUGINS=true` in its environment.
+2. Install the plugin, in the Argo namespace to make it available to every
+   namespace, or in a single workflow namespace:
+
+   ```
+   kubectl -n argo apply -f examples/argo-workflows/executor-plugin/ci-github-notifier-executor-plugin-configmap.yaml
+   ```
+
+   The ConfigMap is generated from `plugin.yaml` by
+   `argo executor-plugin build`. To change the plugin, edit `plugin.yaml`
+   and rebuild the ConfigMap rather than editing the ConfigMap.
+3. Create the credentials in **every namespace that runs workflows using the
+   plugin**: the sidecar runs in the workflow's own namespace, so that is where
+   its secret is looked up. For a GitHub App:
+
+   ```
+   kubectl -n <namespace> create secret generic ci-github-notifier \
+       --from-literal=app_id=123456 \
+       --from-literal=app_private_key="$(base64 -w0 < app.pem)"
+   ```
+
+   The key has to be the base64 `app_private_key` form, because a plugin
+   sidecar cannot mount a secret as a file. To use a personal access token,
+   change the `env` in `plugin.yaml` to an `access_token` variable and rebuild.
+   For GitHub Enterprise, set `gh_url` there as well.
+4. Give workflows a service account the agent can run as. `rbac.yaml` creates
+   one, with the agent's permissions, the permission the workflow's other pods
+   need, and the long-lived token secret that the agent pod mounts. That secret
+   is easy to miss: without it the agent pod waits in `Init` forever, failing
+   to mount it. Apply it in each workflow namespace and set
+   `serviceAccountName: ci-github-notifier-agent` on the workflow.
 
 # Development
 

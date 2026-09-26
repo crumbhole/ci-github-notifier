@@ -1,0 +1,57 @@
+# The ci-github-notifier Argo Workflows executor plugin. Build the
+# installable ConfigMap from this with:
+#   argo executor-plugin build .
+# See README.md alongside for installation.
+apiVersion: argoproj.io/v1alpha1
+kind: ExecutorPlugin
+metadata:
+  name: ci-github-notifier
+  annotations:
+    workflows.argoproj.io/description: >-
+      Posts commit statuses or check runs to GitHub from a workflow, without
+      starting a pod per notification. Credentials are configured once, on
+      this sidecar, from the ci-github-notifier secret.
+    workflows.argoproj.io/version: '>= v3.3'
+spec:
+  sidecar:
+    container:
+      name: ci-github-notifier-executor-plugin
+      image: ghcr.io/crumbhole/ci-github-notifier:stable
+      args: [plugin]
+      ports:
+        # Must match the address the plugin listens on (-address, default
+        # 127.0.0.1:7384). Each plugin in a workflow needs its own port.
+        - containerPort: 7384
+      env:
+        # GitHub App credentials, the same variables as the container
+        # mode. The key must be the base64 form (app_private_key): a
+        # plugin sidecar cannot mount a secret volume. To use a personal
+        # access token instead, replace these with access_token.
+        - name: app_id
+          valueFrom:
+            secretKeyRef:
+              name: ci-github-notifier
+              key: app_id
+        - name: app_private_key
+          valueFrom:
+            secretKeyRef:
+              name: ci-github-notifier
+              key: app_private_key
+        # For GitHub Enterprise, set gh_url here. Workflows cannot set it,
+        # so they cannot send these credentials anywhere else.
+        # - name: gh_url
+        #   value: github.mydomain.biz/api/v3
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

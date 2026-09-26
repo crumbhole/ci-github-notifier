@@ -1,0 +1,48 @@
+# This is an auto-generated file. DO NOT EDIT
+apiVersion: v1
+data:
+  sidecar.automountServiceAccountToken: "false"
+  sidecar.container: |
+    args:
+    - plugin
+    env:
+    - name: app_id
+      valueFrom:
+        secretKeyRef:
+          key: app_id
+          name: ci-github-notifier
+    - name: app_private_key
+      valueFrom:
+        secretKeyRef:
+          key: app_private_key
+          name: ci-github-notifier
+    image: ghcr.io/crumbhole/ci-github-notifier:stable
+    name: ci-github-notifier-executor-plugin
+    ports:
+    - containerPort: 7384
+    resources:
+      limits:
+        cpu: 100m
+        memory: 64Mi
+      requests:
+        cpu: 10m
+        memory: 16Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65534
+kind: ConfigMap
+metadata:
+  annotations:
+    workflows.argoproj.io/description: Posts commit statuses or check runs to GitHub
+      from a workflow, without starting a pod per notification. Credentials are configured
+      once, on this sidecar, from the ci-github-notifier secret.
+    workflows.argoproj.io/version: '>= v3.3'
+  creationTimestamp: null
+  labels:
+    workflows.argoproj.io/configmap-type: ExecutorPlugin
+  name: ci-github-notifier-executor-plugin
