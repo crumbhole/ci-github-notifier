@@ -15,7 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Notifiying Github: %s:%s\n", n.context, n.state)
+	fmt.Printf("Notifying GitHub: %s:%s\n", n.context, n.state)
 
 	creds, err := credentialsFromEnv()
 	if err != nil {

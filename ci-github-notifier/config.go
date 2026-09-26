@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -211,10 +212,13 @@ func accessToken() (string, error) {
 	if err != nil {
 		fmt.Println("No tokenFile found. Falling back to Environment Variable")
 	}
-	if len(data) == 0 {
+	// Files written by editors, echo or secret injectors usually end in
+	// a newline, which would otherwise end up in the Authorization header.
+	token := strings.TrimSpace(string(data))
+	if token == "" {
 		return "", errors.New("no environment variable called access_token available")
 	}
-	return string(data), nil
+	return token, nil
 }
 
 func envOr(e, fallback string) string {

@@ -387,6 +387,37 @@ func TestCredentialsFromEnvReadsTokenFile(t *testing.T) {
 	}
 }
 
+func TestCredentialsFromEnvTrimsTokenFile(t *testing.T) {
+	clearCredentialEnv(t)
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte("token-from-file\n"), 0o600); err != nil {
+		t.Fatalf("writing token file: %v", err)
+	}
+	t.Setenv("tokenFile", path)
+
+	got, err := credentialsFromEnv()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.accessToken != "token-from-file" {
+		t.Errorf("accessToken = %q, want the trailing newline trimmed so it stays out of the Authorization header", got.accessToken)
+	}
+}
+
+func TestCredentialsFromEnvRejectsBlankTokenFile(t *testing.T) {
+	clearCredentialEnv(t)
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte("\n"), 0o600); err != nil {
+		t.Fatalf("writing token file: %v", err)
+	}
+	t.Setenv("tokenFile", path)
+
+	if _, err := credentialsFromEnv(); err == nil {
+		t.Fatal("credentialsFromEnv() = nil error, want an error for a tokenFile holding only whitespace")
+	}
+}
+
 func TestCredentialsFromEnvPrefersAccessTokenOverTokenFile(t *testing.T) {
 	clearCredentialEnv(t)
 	path := filepath.Join(t.TempDir(), "token")
