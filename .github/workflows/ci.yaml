@@ -39,6 +39,9 @@ jobs:
 
   Deploy:
     needs: Lint
+    # Only publish :latest from main. On pull requests this would push
+    # unmerged code as :latest (and fork PRs have no CR_PAT to do it).
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
