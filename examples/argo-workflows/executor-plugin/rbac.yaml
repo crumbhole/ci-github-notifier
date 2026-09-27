@@ -1,0 +1,49 @@
+# The service account the example workflow runs as, with what the Argo
+# agent (which runs the plugin) and the workflow's own pods need.
+# Apply it in each namespace that runs workflows using the plugin:
+#   kubectl -n <namespace> apply -f rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-github-notifier-agent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-github-notifier-agent
+rules:
+  # The agent reads the templates it has to run from the workflow's
+  # task set, and writes their results back to its status.
+  - apiGroups: [argoproj.io]
+    resources: [workflowtasksets]
+    verbs: [list, watch]
+  - apiGroups: [argoproj.io]
+    resources: [workflowtasksets/status]
+    verbs: [patch]
+  # The workflow's other steps run as this service account too, and
+  # their pods report results through workflowtaskresults.
+  - apiGroups: [argoproj.io]
+    resources: [workflowtaskresults]
+    verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-github-notifier-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-github-notifier-agent
+subjects:
+  - kind: ServiceAccount
+    name: ci-github-notifier-agent
+---
+# The agent pod mounts a long-lived token for its service account from a
+# secret of this exact name. Kubernetes no longer creates these itself.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-github-notifier-agent.service-account-token
+  annotations:
+    kubernetes.io/service-account.name: ci-github-notifier-agent
+type: kubernetes.io/service-account-token

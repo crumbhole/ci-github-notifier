@@ -63,7 +63,7 @@ func installationToken(c *req.Client, creds credentials, apiHost, owner, repo st
 		return "", fmt.Errorf("minting installation token: %w", err)
 	}
 	if !resp.IsSuccessState() {
-		return "", fmt.Errorf("minting installation token: github returned %s", resp.Status)
+		return "", githubError("minting installation token", resp)
 	}
 	return minted.Token, nil
 }
@@ -87,7 +87,7 @@ func installationID(c *req.Client, appID, apiHost, owner, repo, signed string) (
 		return 0, fmt.Errorf("GitHub App %s is not installed on %s/%s", appID, owner, repo)
 	}
 	if !resp.IsSuccessState() {
-		return 0, fmt.Errorf("looking up GitHub App installation: github returned %s", resp.Status)
+		return 0, githubError("looking up GitHub App installation", resp)
 	}
 	return installation.ID, nil
 }

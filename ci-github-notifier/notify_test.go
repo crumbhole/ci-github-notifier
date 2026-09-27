@@ -139,6 +139,27 @@ func TestNotifyReportsRejectedStatus(t *testing.T) {
 	}
 }
 
+func TestNotifyReportsGitHubsReasonOnOneLine(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("{\r\n  \"message\": \"Bad credentials\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\"\r\n}"))
+	}))
+	t.Cleanup(srv.Close)
+	n := testNotification()
+	n.apiHost = strings.TrimPrefix(srv.URL, "https://")
+
+	_, err := notify(req.C().EnableInsecureSkipVerify(), n, credentials{accessToken: "ghp_classicpat"})
+
+	if err == nil {
+		t.Fatal("notify() = nil error, want an error when GitHub rejects the credentials")
+	}
+	want := "posting commit status: github returned 401 Unauthorized: Bad credentials"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+}
+
 func TestNotifyRefusesChecksWithoutAppBeforeCallingGitHub(t *testing.T) {
 	rec := &statusRecorder{status: http.StatusCreated}
 	srv := httptest.NewTLSServer(rec)

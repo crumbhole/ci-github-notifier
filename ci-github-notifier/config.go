@@ -53,20 +53,27 @@ func (c credentials) useApp() bool {
 	return c.appID != ""
 }
 
-// notificationFromEnv reads a notification from the environment. Every
-// missing required variable is reported at once, so a misconfigured
-// step can be fixed in one go.
+// notificationFromEnv reads a notification from the environment.
 func notificationFromEnv() (notification, error) {
+	n, err := newNotification(os.Getenv, "environment variable", envOr("gh_url", "api.github.com"))
+	n.checkRunIDFile = os.Getenv("check_run_id_file")
+	return n, err
+}
+
+// newNotification builds a notification for apiHost from the variables
+// get looks up by name. kind describes where they come from, for error
+// messages. Every missing required variable is reported at once, so a
+// misconfigured step can be fixed in one go.
+func newNotification(get func(string) string, kind, apiHost string) (notification, error) {
 	n := notification{
-		state:          os.Getenv("state"),
-		targetURL:      os.Getenv("target_url"),
-		description:    os.Getenv("description"),
-		context:        os.Getenv("context"),
-		apiHost:        envOr("gh_url", "api.github.com"),
-		organisation:   os.Getenv("organisation"),
-		repo:           os.Getenv("app_repo"),
-		sha:            os.Getenv("git_sha"),
-		checkRunIDFile: os.Getenv("check_run_id_file"),
+		state:        get("state"),
+		targetURL:    get("target_url"),
+		description:  get("description"),
+		context:      get("context"),
+		apiHost:      apiHost,
+		organisation: get("organisation"),
+		repo:         get("app_repo"),
+		sha:          get("git_sha"),
 	}
 
 	var errs []error
@@ -80,11 +87,11 @@ func notificationFromEnv() (notification, error) {
 		{"git_sha", n.sha},
 	} {
 		if required.value == "" {
-			errs = append(errs, fmt.Errorf("no environment variable called %s available", required.name))
+			errs = append(errs, fmt.Errorf("no %s called %s available", kind, required.name))
 		}
 	}
 
-	api, err := apiMode(os.Getenv("api"))
+	api, err := apiMode(get("api"))
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -92,7 +99,7 @@ func notificationFromEnv() (notification, error) {
 
 	// check_run_id only means something to the checks API; a stray one
 	// in statuses mode is ignored, as it always has been.
-	if threaded := os.Getenv("check_run_id"); threaded != "" && api == apiChecks {
+	if threaded := get("check_run_id"); threaded != "" && api == apiChecks {
 		id, err := strconv.ParseInt(threaded, 10, 64)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("check_run_id %q is not a number: %w", threaded, err))

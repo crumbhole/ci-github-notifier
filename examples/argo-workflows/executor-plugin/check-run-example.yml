@@ -1,0 +1,114 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: check-run-ci-github-notifier-plugin
+  annotations:
+    workflows.argoproj.io/description: >-
+      Report CI state to GitHub as a check run using the ci-github-notifier
+      executor plugin, so no pod is started per notification.
+
+      The pending report and the final result are the same check run: the
+      plugin returns the new check run's ID as the check_run_id output
+      parameter, and the final task passes it back to update it.
+
+      Needs the executor plugin installed; see README.md alongside.
+    workflows.argoproj.io/maintainer: '@Joibel'
+    workflows.argoproj.io/tags: github
+    workflows.argoproj.io/version: '>= 3.3.1'
+spec:
+  entrypoint: main
+  # The agent pod that runs the plugin uses this service account, which
+  # needs the agent RBAC in rbac.yaml alongside.
+  serviceAccountName: ci-github-notifier-agent
+  arguments:
+    parameters:
+      - name: organisation
+        value: ""
+      - name: app_repo
+        value: ""
+      - name: git_sha
+        value: ""
+      - name: context
+        value: "ci/build"
+  templates:
+  - name: main
+    dag:
+      tasks:
+        - name: notify-pending
+          template: github-notifier
+          arguments:
+            parameters:
+              - name: state
+                value: "pending"
+              - name: description
+                value: "Build running"
+              - name: check_run_id
+                value: ""
+
+        - name: build
+          depends: notify-pending
+          template: build
+
+        # Both outcomes are reported. A bare `depends: build` would only
+        # run on success, leaving a failed build's check run sitting in
+        # progress on the commit for ever.
+        - name: notify-success
+          depends: build.Succeeded
+          template: github-notifier
+          arguments:
+            parameters:
+              - name: state
+                value: "success"
+              - name: description
+                value: "Build passed"
+              - name: check_run_id
+                value: "{{tasks.notify-pending.outputs.parameters.check_run_id}}"
+
+        - name: notify-failure
+          depends: build.Failed || build.Errored
+          template: github-notifier
+          arguments:
+            parameters:
+              - name: state
+                value: "failure"
+              - name: description
+                value: "Build failed"
+              - name: check_run_id
+                value: "{{tasks.notify-pending.outputs.parameters.check_run_id}}"
+
+  - name: build
+    container:
+      image: alpine:3
+      command: [sh, -c]
+      args: ["echo building"]
+
+  - name: github-notifier
+    inputs:
+      parameters:
+      - name: state
+      - name: description
+      - name: check_run_id
+    # The plugin returns check_run_id itself. Declaring it here, as
+    # supplied from outside, lets later tasks refer to it: without this,
+    # workflow validation rejects the
+    # {{tasks.notify-pending.outputs.parameters.check_run_id}} reference.
+    outputs:
+      parameters:
+      - name: check_run_id
+        valueFrom:
+          supplied: {}
+    # Parameters mirror the container mode's environment variables.
+    # Credentials and gh_url are not accepted here: they are configured on
+    # the plugin sidecar. Leave out api (or set it to statuses) to post a
+    # commit status instead of a check run.
+    plugin:
+      ci-github-notifier:
+        api: checks
+        state: "{{inputs.parameters.state}}"
+        target_url: "https://argo-workflows.mydomain.biz/workflows/{{workflow.namespace}}/{{workflow.name}}"
+        description: "{{inputs.parameters.description}}"
+        context: "{{workflow.parameters.context}}"
+        check_run_id: "{{inputs.parameters.check_run_id}}"
+        organisation: "{{workflow.parameters.organisation}}"
+        app_repo: "{{workflow.parameters.app_repo}}"
+        git_sha: "{{workflow.parameters.git_sha}}"

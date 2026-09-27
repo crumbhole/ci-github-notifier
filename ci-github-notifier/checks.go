@@ -47,7 +47,7 @@ func postCheckRun(c *req.Client, auth string, n notification) (int64, error) {
 		return 0, fmt.Errorf("creating check run: %w", err)
 	}
 	if !resp.IsSuccessState() {
-		return 0, fmt.Errorf("creating check run: github returned %s", resp.Status)
+		return 0, githubError("creating check run", resp)
 	}
 	return created.ID, nil
 }
@@ -104,7 +104,7 @@ func patchCheckRun(c *req.Client, auth string, n notification) error {
 		return fmt.Errorf("updating check run %d: %w", id, err)
 	}
 	if !resp.IsSuccessState() {
-		return fmt.Errorf("updating check run %d: github returned %s", id, resp.Status)
+		return githubError(fmt.Sprintf("updating check run %d", id), resp)
 	}
 	return nil
 }
