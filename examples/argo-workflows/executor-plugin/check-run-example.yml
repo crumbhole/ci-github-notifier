@@ -14,11 +14,11 @@ metadata:
       Needs the executor plugin installed; see README.md alongside.
     workflows.argoproj.io/maintainer: '@Joibel'
     workflows.argoproj.io/tags: github
-    workflows.argoproj.io/version: '>= 3.3.0'
+    workflows.argoproj.io/version: '>= 3.3.1'
 spec:
   entrypoint: main
   # The agent pod that runs the plugin uses this service account, which
-  # needs the agent RBAC in README.md.
+  # needs the agent RBAC in rbac.yaml alongside.
   serviceAccountName: ci-github-notifier-agent
   arguments:
     parameters:

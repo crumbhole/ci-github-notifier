@@ -41,7 +41,7 @@ metadata:
     workflows.argoproj.io/description: Posts commit statuses or check runs to GitHub
       from a workflow, without starting a pod per notification. Credentials are configured
       once, on this sidecar, from the ci-github-notifier secret.
-    workflows.argoproj.io/version: '>= v3.3'
+    workflows.argoproj.io/version: '>= v3.3.1'
   creationTimestamp: null
   labels:
     workflows.argoproj.io/configmap-type: ExecutorPlugin

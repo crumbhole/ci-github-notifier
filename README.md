@@ -195,8 +195,8 @@ Each notification in the examples above starts a pod. The same image can instead
 run as an [Argo Workflows executor plugin](https://argo-workflows.readthedocs.io/en/latest/executor_plugins/):
 a sidecar in each workflow's agent pod that posts a notification each time a
 `plugin:` template runs, without starting a pod for it. The files are in
-`examples/argo-workflows/executor-plugin/`. This has been tested with Argo
-Workflows v4.0.5.
+`examples/argo-workflows/executor-plugin/`. It needs Argo Workflows v3.3.1 or
+later, and has been tested with v4.0.5.
 
 A notification is a template with the same parameters as the environment
 variables above:

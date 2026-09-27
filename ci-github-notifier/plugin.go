@@ -43,8 +43,11 @@ const (
 	// timed-out call, and a retried create would post a second check run.
 	githubRequestTimeout = 8 * time.Second
 
-	// maxRequestBytes caps the request body; it carries one template.
-	maxRequestBytes = 1 << 20
+	// maxRequestBytes caps the request body. It carries one template with
+	// its parameters substituted, which Kubernetes' object size limit
+	// (about 1.5MiB in etcd) keeps well under this. The body is only read
+	// once the caller has shown the agent's token.
+	maxRequestBytes = 8 << 20
 )
 
 // The phases a node can finish in.
